@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { Plus, Minus, ShoppingCart, Send, PackagePlus } from 'lucide-react';
+import { Plus, Minus, ShoppingCart, Send, PackagePlus, Flame } from 'lucide-react';
 import { toast } from 'sonner';
 
 const UserSection = () => {
@@ -61,23 +61,29 @@ const UserSection = () => {
     }
   };
 
+  const getCartQty = (id: string) => cart.find(c => c.menuItem.id === id)?.quantity || 0;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Menu</h2>
-          <p className="text-muted-foreground text-sm">Browse and order your favourites</p>
+          <h2 className="text-3xl font-bold text-foreground tracking-tight">
+            Our Menu
+          </h2>
+          <p className="text-muted-foreground text-sm mt-1 flex items-center gap-1">
+            <Flame className="h-3.5 w-3.5 text-primary" />
+            Fresh & made with love
+          </p>
         </div>
         <Button
-          variant="default"
-          className="relative"
+          className="relative gradient-warm text-primary-foreground rounded-2xl px-5 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all"
           onClick={() => setShowCart(!showCart)}
         >
           <ShoppingCart className="h-4 w-4 mr-2" />
           Cart
           {cartCount > 0 && (
-            <span className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
+            <span className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center animate-bounce">
               {cartCount}
             </span>
           )}
@@ -86,76 +92,84 @@ const UserSection = () => {
 
       {/* Active Order Status */}
       {activeOrder && (
-        <Card className="p-4 border-2 border-primary/30 bg-primary/5">
+        <Card className="p-5 border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl food-card-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-semibold text-foreground">Order {activeOrder.id}</p>
+              <p className="font-bold text-foreground text-lg">{activeOrder.id}</p>
               <p className="text-sm text-muted-foreground">Table {activeOrder.tableNumber}</p>
             </div>
-            <Badge variant={
-              activeOrder.status === 'pending' ? 'secondary' :
-              activeOrder.status === 'confirmed' ? 'default' :
-              activeOrder.status === 'ready' ? 'outline' :
-              activeOrder.status === 'rejected' ? 'destructive' : 'secondary'
-            }>
-              {activeOrder.status === 'pending' && '⏳ Waiting for confirmation'}
-              {activeOrder.status === 'confirmed' && '👨‍🍳 Being prepared'}
+            <Badge className={`rounded-full px-4 py-1.5 text-xs font-semibold ${
+              activeOrder.status === 'pending' ? 'bg-warning/15 text-warning border-warning/30' :
+              activeOrder.status === 'confirmed' ? 'gradient-warm text-primary-foreground' :
+              activeOrder.status === 'ready' ? 'gradient-cool text-accent-foreground' :
+              activeOrder.status === 'rejected' ? 'bg-destructive/15 text-destructive' : ''
+            }`}>
+              {activeOrder.status === 'pending' && '⏳ Waiting'}
+              {activeOrder.status === 'confirmed' && '👨‍🍳 Preparing'}
               {activeOrder.status === 'ready' && '✅ Ready!'}
               {activeOrder.status === 'rejected' && '❌ Rejected'}
             </Badge>
           </div>
-          <p className="text-sm mt-2 text-muted-foreground">
-            Total: ₹{activeOrder.totalAmount}
-            {activeOrder.additionalRequests.length > 0 && ` (includes ${activeOrder.additionalRequests.length} additional items)`}
+          <p className="text-sm mt-3 text-muted-foreground font-medium">
+            Total: <span className="text-primary font-bold text-base">₹{activeOrder.totalAmount}</span>
+            {activeOrder.additionalRequests.length > 0 && ` (+ ${activeOrder.additionalRequests.length} added)`}
           </p>
           {isOrderConfirmed && (
-            <p className="text-xs mt-1 text-primary font-medium">Order confirmed — you can request more items below</p>
+            <p className="text-xs mt-2 text-accent font-semibold">✨ Order confirmed — add more items below</p>
           )}
         </Card>
       )}
 
       {/* Cart Panel */}
       {showCart && (
-        <Card className="p-4 space-y-4">
-          <h3 className="font-semibold text-foreground">Your Cart</h3>
+        <Card className="p-5 space-y-4 rounded-2xl glass food-card-shadow">
+          <h3 className="font-bold text-foreground text-lg">🛒 Your Cart</h3>
           {cart.length === 0 ? (
-            <p className="text-muted-foreground text-sm">Your cart is empty</p>
+            <p className="text-muted-foreground text-sm text-center py-6">Your cart is empty — start adding delicious items!</p>
           ) : (
             <>
               {cart.map(item => (
-                <div key={item.menuItem.id} className="flex items-center justify-between">
-                  <span className="text-sm text-foreground">{item.menuItem.emoji} {item.menuItem.name}</span>
+                <div key={item.menuItem.id} className="flex items-center justify-between py-2">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={item.menuItem.image}
+                      alt={item.menuItem.name}
+                      className="w-10 h-10 rounded-xl object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                    <span className="text-sm font-medium text-foreground">{item.menuItem.name}</span>
+                  </div>
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => removeFromCart(item.menuItem.id)}>
+                    <Button variant="outline" size="icon" className="h-7 w-7 rounded-full" onClick={() => removeFromCart(item.menuItem.id)}>
                       <Minus className="h-3 w-3" />
                     </Button>
-                    <span className="text-sm font-medium w-6 text-center">{item.quantity}</span>
-                    <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => addToCart(item.menuItem)}>
+                    <span className="text-sm font-bold w-6 text-center text-foreground">{item.quantity}</span>
+                    <Button variant="outline" size="icon" className="h-7 w-7 rounded-full" onClick={() => addToCart(item.menuItem)}>
                       <Plus className="h-3 w-3" />
                     </Button>
-                    <span className="text-sm text-muted-foreground w-16 text-right">₹{item.menuItem.price * item.quantity}</span>
+                    <span className="text-sm font-semibold text-primary w-16 text-right">₹{item.menuItem.price * item.quantity}</span>
                   </div>
                 </div>
               ))}
-              <div className="border-t pt-3 flex justify-between font-semibold text-foreground">
+              <div className="border-t border-border/50 pt-4 flex justify-between font-bold text-foreground text-lg">
                 <span>Total</span>
-                <span>₹{cartTotal}</span>
+                <span className="text-primary">₹{cartTotal}</span>
               </div>
 
               {!activeOrderId && (
                 <div className="grid grid-cols-2 gap-3">
-                  <Input placeholder="Table No." value={tableNumber} onChange={e => setTableNumber(e.target.value)} type="number" />
-                  <Input placeholder="Phone (WhatsApp)" value={phone} onChange={e => setPhone(e.target.value)} />
+                  <Input className="rounded-xl" placeholder="Table No." value={tableNumber} onChange={e => setTableNumber(e.target.value)} type="number" />
+                  <Input className="rounded-xl" placeholder="WhatsApp No." value={phone} onChange={e => setPhone(e.target.value)} />
                 </div>
               )}
 
               {!isOrderConfirmed ? (
-                <Button className="w-full" onClick={handlePlaceOrder} disabled={!!activeOrderId && activeOrder?.status === 'pending'}>
+                <Button className="w-full gradient-warm text-primary-foreground rounded-2xl h-12 text-base font-semibold shadow-lg shadow-primary/20" onClick={handlePlaceOrder} disabled={!!activeOrderId && activeOrder?.status === 'pending'}>
                   <Send className="h-4 w-4 mr-2" />
-                  {activeOrderId ? 'Waiting for confirmation...' : 'Confirm Order'}
+                  {activeOrderId ? 'Waiting for confirmation...' : 'Place Order'}
                 </Button>
               ) : (
-                <Button className="w-full" onClick={handleRequestMore}>
+                <Button className="w-full gradient-cool text-accent-foreground rounded-2xl h-12 text-base font-semibold" onClick={handleRequestMore}>
                   <PackagePlus className="h-4 w-4 mr-2" />
                   Request More Items
                 </Button>
@@ -168,22 +182,49 @@ const UserSection = () => {
       {/* Menu Grid */}
       {categories.map(cat => (
         <div key={cat}>
-          <h3 className="font-semibold text-foreground mb-3 text-lg">{cat}</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {availableMenu.filter(i => i.category === cat).map(item => (
-              <Card key={item.id} className="p-4 flex items-center justify-between hover:shadow-md transition-shadow cursor-pointer group" onClick={() => addToCart(item)}>
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">{item.emoji}</span>
-                  <div>
-                    <p className="font-medium text-foreground">{item.name}</p>
-                    <p className="text-sm text-primary font-semibold">₹{item.price}</p>
+          <h3 className="font-bold text-foreground mb-4 text-xl flex items-center gap-2">
+            <span className="w-1 h-6 gradient-warm rounded-full inline-block" />
+            {cat}
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+            {availableMenu.filter(i => i.category === cat).map(item => {
+              const qty = getCartQty(item.id);
+              return (
+                <Card
+                  key={item.id}
+                  className="overflow-hidden rounded-2xl hover:food-card-shadow transition-all duration-300 group cursor-pointer border-border/50 hover:border-primary/30 hover:-translate-y-1"
+                  onClick={() => addToCart(item)}
+                >
+                  <div className="relative h-32 overflow-hidden">
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        target.parentElement!.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-secondary text-4xl">${item.emoji}</div>`;
+                      }}
+                    />
+                    {qty > 0 && (
+                      <div className="absolute top-2 right-2 gradient-warm text-primary-foreground text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg">
+                        {qty}
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
                   </div>
-                </div>
-                <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </Card>
-            ))}
+                  <div className="p-3">
+                    <p className="font-semibold text-foreground text-sm truncate">{item.name}</p>
+                    <div className="flex items-center justify-between mt-1">
+                      <p className="text-primary font-bold">₹{item.price}</p>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full opacity-0 group-hover:opacity-100 transition-opacity bg-primary/10 hover:bg-primary/20">
+                        <Plus className="h-3.5 w-3.5 text-primary" />
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
           </div>
         </div>
       ))}
