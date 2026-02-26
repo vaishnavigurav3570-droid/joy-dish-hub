@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Send, TrendingUp, UtensilsCrossed, BarChart3, Zap } from 'lucide-react';
+import { Send, TrendingUp, UtensilsCrossed, BarChart3, Zap, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { generateWhatsAppBillLink } from '@/lib/phone';
 
 const OwnerSection = () => {
   const { orders, menu, toggleMenuAvailability, markBillSent, salesData, topItems } = useOrders();
@@ -17,9 +18,15 @@ const OwnerSection = () => {
   const totalRevenue = salesData.reduce((sum, d) => sum + d.revenue, 0);
   const totalOrders = salesData.reduce((sum, d) => sum + d.orders, 0);
 
-  const handleSendBill = (orderId: string, phone: string) => {
+  const handleSendBill = (orderId: string, phone: string, order: typeof orders[0]) => {
+    const items = [
+      ...order.items.map(i => ({ name: i.menuItem.name, qty: i.quantity, price: i.menuItem.price })),
+      ...order.additionalRequests.map(i => ({ name: i.menuItem.name, qty: i.quantity, price: i.menuItem.price })),
+    ];
+    const whatsappLink = generateWhatsAppBillLink(phone, orderId, items, order.totalAmount);
+    window.open(whatsappLink, '_blank');
     markBillSent(orderId);
-    toast.success(`Bill sent to ${phone} on WhatsApp!`);
+    toast.success(`Bill sent to ${phone} via WhatsApp!`);
   };
 
   return (
@@ -27,8 +34,7 @@ const OwnerSection = () => {
       <div>
         <h2 className="text-3xl font-bold text-foreground tracking-tight">Dashboard</h2>
         <p className="text-muted-foreground text-sm mt-1 flex items-center gap-1">
-          <Zap className="h-3.5 w-3.5 text-primary" />
-          Restaurant command center
+          <Zap className="h-3.5 w-3.5 text-primary" /> Restaurant command center
         </p>
       </div>
 
@@ -98,8 +104,8 @@ const OwnerSection = () => {
                 <div className="border-t border-border/50 pt-3 flex items-center justify-between">
                   <p className="font-bold text-foreground text-lg">₹{order.totalAmount}</p>
                   {!order.billSent ? (
-                    <Button size="sm" className="gradient-warm text-primary-foreground rounded-xl font-semibold" onClick={() => handleSendBill(order.id, order.userPhone)}>
-                      <Send className="h-3 w-3 mr-1" /> Send Bill
+                    <Button size="sm" className="gradient-warm text-primary-foreground rounded-xl font-semibold" onClick={() => handleSendBill(order.id, order.userPhone, order)}>
+                      <MessageCircle className="h-3 w-3 mr-1" /> Send via WhatsApp
                     </Button>
                   ) : (
                     <Badge className="rounded-full bg-accent/15 text-accent border-accent/30 font-semibold">✅ Bill Sent</Badge>
@@ -116,15 +122,9 @@ const OwnerSection = () => {
           {menu.map(item => (
             <div key={item.id} className="flex items-center justify-between py-3 px-4 rounded-xl hover:bg-secondary/50 transition-colors border-b border-border/30 last:border-0">
               <div className="flex items-center gap-3">
-                <img
-                  src={item.image}
-                  alt={item.name}
+                <img src={item.image} alt={item.name}
                   className={`w-10 h-10 rounded-xl object-cover ${!item.available ? 'opacity-40 grayscale' : ''}`}
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                  }}
-                />
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                 <div>
                   <p className={`font-semibold text-sm ${item.available ? 'text-foreground' : 'text-muted-foreground line-through'}`}>
                     {item.name}
@@ -139,7 +139,6 @@ const OwnerSection = () => {
 
         {/* Analytics */}
         <TabsContent value="analytics" className="space-y-6 mt-6">
-          {/* Summary Cards */}
           <div className="grid grid-cols-2 gap-4">
             <Card className="p-5 rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10 border-primary/15 stat-glow">
               <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Weekly Revenue</p>
@@ -155,7 +154,6 @@ const OwnerSection = () => {
             </Card>
           </div>
 
-          {/* Chart */}
           <Card className="p-5 rounded-2xl">
             <h4 className="font-bold text-foreground mb-4 text-base">Daily Revenue</h4>
             <ResponsiveContainer width="100%" height={200}>
@@ -163,20 +161,12 @@ const OwnerSection = () => {
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={v => v.slice(5)} stroke="hsl(var(--muted-foreground))" />
                 <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                <Tooltip
-                  contentStyle={{
-                    background: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '12px',
-                    color: 'hsl(var(--foreground))',
-                  }}
-                />
+                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '12px', color: 'hsl(var(--foreground))' }} />
                 <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </Card>
 
-          {/* Top Items */}
           <Card className="p-5 rounded-2xl">
             <h4 className="font-bold text-foreground mb-4 text-base">🏆 Most Sold Items</h4>
             <div className="space-y-3">
@@ -187,9 +177,7 @@ const OwnerSection = () => {
                       idx === 0 ? 'gradient-warm text-primary-foreground' :
                       idx === 1 ? 'bg-secondary text-foreground' :
                       'bg-muted text-muted-foreground'
-                    }`}>
-                      {idx + 1}
-                    </span>
+                    }`}>{idx + 1}</span>
                     <span className="text-sm font-medium text-foreground">{item.name}</span>
                   </div>
                   <span className="text-sm font-bold text-primary">{item.count} sold</span>

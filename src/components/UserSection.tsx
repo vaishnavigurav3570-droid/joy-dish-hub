@@ -5,14 +5,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { Plus, Minus, ShoppingCart, Send, PackagePlus, Flame } from 'lucide-react';
+import { Plus, Minus, ShoppingCart, Send, PackagePlus, Flame, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { validateIndianPhone } from '@/lib/phone';
 
 const UserSection = () => {
   const { menu, orders, placeOrder, addMoreItems } = useOrders();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [tableNumber, setTableNumber] = useState('');
   const [phone, setPhone] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
   const [showCart, setShowCart] = useState(false);
 
@@ -41,10 +43,22 @@ const UserSection = () => {
   const cartTotal = cart.reduce((sum, i) => sum + i.menuItem.price * i.quantity, 0);
   const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0);
 
+  const handlePhoneChange = (value: string) => {
+    setPhone(value);
+    if (value.length > 0) {
+      const { valid, error } = validateIndianPhone(value);
+      setPhoneError(valid ? '' : (error || ''));
+    } else {
+      setPhoneError('');
+    }
+  };
+
   const handlePlaceOrder = () => {
-    if (!tableNumber || !phone) { toast.error('Please enter table number and phone'); return; }
+    if (!tableNumber) { toast.error('Please enter table number'); return; }
+    const { valid, cleaned, error } = validateIndianPhone(phone);
+    if (!valid) { setPhoneError(error || 'Invalid phone'); toast.error(error || 'Invalid phone number'); return; }
     if (cart.length === 0) { toast.error('Add items to your cart first'); return; }
-    const id = placeOrder(cart, parseInt(tableNumber), phone);
+    const id = placeOrder(cart, parseInt(tableNumber), cleaned);
     setActiveOrderId(id);
     setCart([]);
     setShowCart(false);
@@ -68,20 +82,16 @@ const UserSection = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-foreground tracking-tight">
-            Our Menu
-          </h2>
+          <h2 className="text-3xl font-bold text-foreground tracking-tight">Our Menu</h2>
           <p className="text-muted-foreground text-sm mt-1 flex items-center gap-1">
-            <Flame className="h-3.5 w-3.5 text-primary" />
-            Fresh & made with love
+            <Flame className="h-3.5 w-3.5 text-primary" /> Fresh & made with love
           </p>
         </div>
         <Button
           className="relative gradient-warm text-primary-foreground rounded-2xl px-5 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all"
           onClick={() => setShowCart(!showCart)}
         >
-          <ShoppingCart className="h-4 w-4 mr-2" />
-          Cart
+          <ShoppingCart className="h-4 w-4 mr-2" /> Cart
           {cartCount > 0 && (
             <span className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center animate-bounce">
               {cartCount}
@@ -131,12 +141,8 @@ const UserSection = () => {
               {cart.map(item => (
                 <div key={item.menuItem.id} className="flex items-center justify-between py-2">
                   <div className="flex items-center gap-3">
-                    <img
-                      src={item.menuItem.image}
-                      alt={item.menuItem.name}
-                      className="w-10 h-10 rounded-xl object-cover"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                    />
+                    <img src={item.menuItem.image} alt={item.menuItem.name} className="w-10 h-10 rounded-xl object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                     <span className="text-sm font-medium text-foreground">{item.menuItem.name}</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -157,9 +163,23 @@ const UserSection = () => {
               </div>
 
               {!activeOrderId && (
-                <div className="grid grid-cols-2 gap-3">
-                  <Input className="rounded-xl" placeholder="Table No." value={tableNumber} onChange={e => setTableNumber(e.target.value)} type="number" />
-                  <Input className="rounded-xl" placeholder="WhatsApp No." value={phone} onChange={e => setPhone(e.target.value)} />
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input className="rounded-xl" placeholder="Table No." value={tableNumber} onChange={e => setTableNumber(e.target.value)} type="number" />
+                    <div className="relative">
+                      <Input
+                        className={`rounded-xl ${phoneError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                        placeholder="WhatsApp No."
+                        value={phone}
+                        onChange={e => handlePhoneChange(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  {phoneError && (
+                    <p className="text-destructive text-xs flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" /> {phoneError}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -170,8 +190,7 @@ const UserSection = () => {
                 </Button>
               ) : (
                 <Button className="w-full gradient-cool text-accent-foreground rounded-2xl h-12 text-base font-semibold" onClick={handleRequestMore}>
-                  <PackagePlus className="h-4 w-4 mr-2" />
-                  Request More Items
+                  <PackagePlus className="h-4 w-4 mr-2" /> Request More Items
                 </Button>
               )}
             </>
@@ -183,33 +202,22 @@ const UserSection = () => {
       {categories.map(cat => (
         <div key={cat}>
           <h3 className="font-bold text-foreground mb-4 text-xl flex items-center gap-2">
-            <span className="w-1 h-6 gradient-warm rounded-full inline-block" />
-            {cat}
+            <span className="w-1 h-6 gradient-warm rounded-full inline-block" /> {cat}
           </h3>
           <div className="grid grid-cols-2 gap-4">
             {availableMenu.filter(i => i.category === cat).map(item => {
               const qty = getCartQty(item.id);
               return (
-                <Card
-                  key={item.id}
-                  className="overflow-hidden rounded-2xl hover:food-card-shadow transition-all duration-300 group cursor-pointer border-border/50 hover:border-primary/30 hover:-translate-y-1"
-                  onClick={() => addToCart(item)}
-                >
+                <Card key={item.id} className="overflow-hidden rounded-2xl hover:food-card-shadow transition-all duration-300 group cursor-pointer border-border/50 hover:border-primary/30 hover:-translate-y-1" onClick={() => addToCart(item)}>
                   <div className="relative h-32 overflow-hidden">
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
                         target.style.display = 'none';
                         target.parentElement!.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-secondary text-4xl">${item.emoji}</div>`;
-                      }}
-                    />
+                      }} />
                     {qty > 0 && (
-                      <div className="absolute top-2 right-2 gradient-warm text-primary-foreground text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg">
-                        {qty}
-                      </div>
+                      <div className="absolute top-2 right-2 gradient-warm text-primary-foreground text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg">{qty}</div>
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
                   </div>
