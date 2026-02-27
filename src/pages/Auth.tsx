@@ -24,16 +24,19 @@ const Auth = ({ onGuestAccess }: { onGuestAccess: () => void }) => {
     setLoading(true);
     try {
       if (isSignup) {
-        const { error } = await supabase.auth.signUp({
+        const { data: signUpData, error } = await supabase.auth.signUp({
           email,
           password,
           options: { data: { display_name: email.split('@')[0], role: roleTab } },
         });
         if (error) throw error;
-        // Assign role after signup
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          await (supabase as any).from('user_roles').insert({ user_id: user.id, role: roleTab });
+        // Assign role after signup - use the user from signUp response
+        const newUser = signUpData?.user;
+        if (newUser) {
+          // Small delay to ensure session is established
+          await new Promise(r => setTimeout(r, 500));
+          const { error: roleError } = await (supabase as any).from('user_roles').insert({ user_id: newUser.id, role: roleTab });
+          if (roleError) console.error('Role assignment error:', roleError);
         }
         toast.success('Account created! You are now logged in.');
       } else {
