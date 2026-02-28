@@ -42,11 +42,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  // Clear stale session on mount to prevent infinite refresh loops
   useEffect(() => {
     let mounted = true;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
+      
+      if (event === 'TOKEN_REFRESHED' && !session) {
+        // Token refresh failed — clear stale session
+        await supabase.auth.signOut();
+        setSession(null);
+        setUser(null);
+        setRole('user');
+        setLoading(false);
+        return;
+      }
+
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -58,13 +70,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     });
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
       if (!mounted) return;
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchRole(session.user.id);
+      
+      if (error || !session) {
+        // If getSession fails, clear any stale tokens
+        if (error) {
+          console.warn('Session recovery failed, clearing stale session:', error.message);
+          await supabase.auth.signOut();
+        }
+        setSession(null);
+        setUser(null);
+        setRole('user');
+        setLoading(false);
+        return;
       }
+
+      setSession(session);
+      setUser(session.user);
+      await fetchRole(session.user.id);
       setLoading(false);
     });
 
@@ -76,6 +100,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
     setRole('user');
     setIsGuest(false);
   };
