@@ -30,7 +30,7 @@ interface OrderContextType {
   menu: MenuItem[];
   orders: Order[];
   toggleMenuAvailability: (id: string) => void;
-  placeOrder: (items: CartItem[], tableNumber: number, phone: string) => string;
+  placeOrder: (items: CartItem[], tableNumber: number, phone: string, customerName: string) => string;
   confirmOrder: (orderId: string) => void;
   rejectOrder: (orderId: string) => void;
   markReady: (orderId: string) => void;
@@ -56,7 +56,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setMenu(prev => prev.map(item => item.id === id ? { ...item, available: !item.available } : item));
   }, []);
 
-  const placeOrder = useCallback((items: CartItem[], tableNumber: number, phone: string) => {
+  const placeOrder = useCallback((items: CartItem[], tableNumber: number, phone: string, customerName: string) => {
     const id = `ORD-${Date.now().toString(36).toUpperCase()}`;
     const totalAmount = items.reduce((sum, i) => sum + i.menuItem.price * i.quantity, 0);
     const order: Order = {
@@ -66,6 +66,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       status: 'pending',
       createdAt: new Date(),
       userPhone: phone,
+      customerName,
       totalAmount,
       billSent: false,
       additionalRequests: [],

@@ -5,28 +5,50 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Send, TrendingUp, UtensilsCrossed, BarChart3, Zap, MessageCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Send, TrendingUp, UtensilsCrossed, BarChart3, Zap, MessageCircle, FileText, Download, Eye, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { generateWhatsAppBillLink } from '@/lib/phone';
+import { generateWhatsAppBillLink, generateBillText } from '@/lib/phone';
+import { Order } from '@/types/order';
 
 const OwnerSection = () => {
   const { orders, menu, toggleMenuAvailability, markBillSent, salesData, topItems } = useOrders();
   const [ownerTab, setOwnerTab] = useState('orders');
+  const [previewOrder, setPreviewOrder] = useState<Order | null>(null);
 
   const liveOrders = orders.filter(o => o.status !== 'rejected');
-  const totalRevenue = salesData.reduce((sum, d) => sum + d.revenue, 0);
-  const totalOrders = salesData.reduce((sum, d) => sum + d.orders, 0);
+  const totalRevenue = orders.reduce((sum, o) => sum + o.totalAmount, 0);
+  const totalOrders = orders.length;
 
-  const handleSendBill = (orderId: string, phone: string, order: typeof orders[0]) => {
-    const items = [
-      ...order.items.map(i => ({ name: i.menuItem.name, qty: i.quantity, price: i.menuItem.price })),
-      ...order.additionalRequests.map(i => ({ name: i.menuItem.name, qty: i.quantity, price: i.menuItem.price })),
-    ];
-    const whatsappLink = generateWhatsAppBillLink(phone, orderId, items, order.totalAmount);
+  const getOrderItems = (order: Order) => [
+    ...order.items.map(i => ({ name: i.menuItem.name, qty: i.quantity, price: i.menuItem.price })),
+    ...order.additionalRequests.map(i => ({ name: i.menuItem.name, qty: i.quantity, price: i.menuItem.price })),
+  ];
+
+  const getBillText = (order: Order) => generateBillText(
+    order.id, order.tableNumber, order.customerName, order.userPhone,
+    getOrderItems(order), order.totalAmount, order.createdAt
+  );
+
+  const handleDownloadBill = (order: Order) => {
+    const text = getBillText(order);
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `bill-${order.id}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Bill downloaded!');
+  };
+
+  const handleSendBill = (order: Order) => {
+    const items = getOrderItems(order);
+    const whatsappLink = generateWhatsAppBillLink(order.userPhone, order.id, items, order.totalAmount, order.customerName);
     window.open(whatsappLink, '_blank');
-    markBillSent(orderId);
-    toast.success(`Bill sent to ${phone} via WhatsApp!`);
+    markBillSent(order.id);
+    toast.success(`Bill sent to ${order.userPhone} via WhatsApp!`);
   };
 
   return (
@@ -34,8 +56,20 @@ const OwnerSection = () => {
       <div>
         <h2 className="text-3xl font-bold text-foreground tracking-tight">Dashboard</h2>
         <p className="text-muted-foreground text-sm mt-1 flex items-center gap-1">
-          <Zap className="h-3.5 w-3.5 text-primary" /> Restaurant command center
+          <Zap className="h-3.5 w-3.5 text-primary" /> The Curry Corner — command center
         </p>
+      </div>
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-2 gap-4">
+        <Card className="p-4 rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10 border-primary/15 stat-glow">
+          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Revenue</p>
+          <p className="text-2xl font-extrabold text-foreground mt-1">₹{totalRevenue.toLocaleString()}</p>
+        </Card>
+        <Card className="p-4 rounded-2xl bg-gradient-to-br from-accent/5 to-accent/10 border-accent/15">
+          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Orders</p>
+          <p className="text-2xl font-extrabold text-foreground mt-1">{totalOrders}</p>
+        </Card>
       </div>
 
       <Tabs value={ownerTab} onValueChange={setOwnerTab}>
@@ -66,7 +100,7 @@ const OwnerSection = () => {
                   <div>
                     <p className="font-bold text-foreground text-base">{order.id}</p>
                     <p className="text-sm text-muted-foreground">
-                      Table {order.tableNumber} • {order.userPhone}
+                      Table {order.tableNumber} • {order.customerName} • {order.userPhone}
                     </p>
                   </div>
                   <Badge className={`rounded-full px-3 py-1 text-xs font-semibold ${
@@ -101,14 +135,24 @@ const OwnerSection = () => {
                   ))}
                 </div>
 
-                <div className="border-t border-border/50 pt-3 flex items-center justify-between">
-                  <p className="font-bold text-foreground text-lg">₹{order.totalAmount}</p>
+                <div className="border-t border-border/50 pt-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="font-bold text-foreground text-lg">₹{order.totalAmount}</p>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" className="rounded-xl text-xs" onClick={() => setPreviewOrder(order)}>
+                        <Eye className="h-3 w-3 mr-1" /> Preview
+                      </Button>
+                      <Button size="sm" variant="outline" className="rounded-xl text-xs" onClick={() => handleDownloadBill(order)}>
+                        <Download className="h-3 w-3 mr-1" /> Download
+                      </Button>
+                    </div>
+                  </div>
                   {!order.billSent ? (
-                    <Button size="sm" className="gradient-warm text-primary-foreground rounded-xl font-semibold" onClick={() => handleSendBill(order.id, order.userPhone, order)}>
-                      <MessageCircle className="h-3 w-3 mr-1" /> Send via WhatsApp
+                    <Button size="sm" className="w-full gradient-warm text-primary-foreground rounded-xl font-semibold" onClick={() => handleSendBill(order)}>
+                      <MessageCircle className="h-3 w-3 mr-1" /> Send Bill via WhatsApp
                     </Button>
                   ) : (
-                    <Badge className="rounded-full bg-accent/15 text-accent border-accent/30 font-semibold">✅ Bill Sent</Badge>
+                    <Badge className="rounded-full bg-accent/15 text-accent border-accent/30 font-semibold w-full justify-center py-1.5">✅ Bill Sent</Badge>
                   )}
                 </div>
               </Card>
@@ -137,56 +181,97 @@ const OwnerSection = () => {
           ))}
         </TabsContent>
 
-        {/* Analytics */}
+        {/* Analytics — uses real order data */}
         <TabsContent value="analytics" className="space-y-6 mt-6">
-          <div className="grid grid-cols-2 gap-4">
-            <Card className="p-5 rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10 border-primary/15 stat-glow">
-              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Weekly Revenue</p>
-              <p className="text-2xl font-extrabold text-foreground mt-1">₹{totalRevenue.toLocaleString()}</p>
-              <p className="text-xs text-accent flex items-center gap-1 mt-2 font-semibold">
-                <TrendingUp className="h-3 w-3" /> +12% vs last week
-              </p>
-            </Card>
-            <Card className="p-5 rounded-2xl bg-gradient-to-br from-accent/5 to-accent/10 border-accent/15">
-              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Total Orders</p>
-              <p className="text-2xl font-extrabold text-foreground mt-1">{totalOrders}</p>
-              <p className="text-xs text-muted-foreground mt-2">Avg ₹{Math.round(totalRevenue / totalOrders)}/order</p>
-            </Card>
-          </div>
-
           <Card className="p-5 rounded-2xl">
-            <h4 className="font-bold text-foreground mb-4 text-base">Daily Revenue</h4>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={salesData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={v => v.slice(5)} stroke="hsl(var(--muted-foreground))" />
-                <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '12px', color: 'hsl(var(--foreground))' }} />
-                <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <h4 className="font-bold text-foreground mb-4 text-base">🏆 Most Ordered Items</h4>
+            {orders.length === 0 ? (
+              <p className="text-muted-foreground text-sm text-center py-4">Place some orders to see analytics</p>
+            ) : (
+              <div className="space-y-3">
+                {(() => {
+                  const counts: Record<string, number> = {};
+                  orders.forEach(o => {
+                    [...o.items, ...o.additionalRequests].forEach(i => {
+                      counts[i.menuItem.name] = (counts[i.menuItem.name] || 0) + i.quantity;
+                    });
+                  });
+                  return Object.entries(counts)
+                    .sort(([,a], [,b]) => b - a)
+                    .slice(0, 5)
+                    .map(([name, count], idx) => (
+                      <div key={name} className="flex items-center justify-between py-1">
+                        <div className="flex items-center gap-3">
+                          <span className={`text-xs font-extrabold w-6 h-6 rounded-full flex items-center justify-center ${
+                            idx === 0 ? 'gradient-warm text-primary-foreground' :
+                            idx === 1 ? 'bg-secondary text-foreground' :
+                            'bg-muted text-muted-foreground'
+                          }`}>{idx + 1}</span>
+                          <span className="text-sm font-medium text-foreground">{name}</span>
+                        </div>
+                        <span className="text-sm font-bold text-primary">{count} ordered</span>
+                      </div>
+                    ));
+                })()}
+              </div>
+            )}
           </Card>
 
           <Card className="p-5 rounded-2xl">
-            <h4 className="font-bold text-foreground mb-4 text-base">🏆 Most Sold Items</h4>
-            <div className="space-y-3">
-              {topItems.map((item, idx) => (
-                <div key={item.name} className="flex items-center justify-between py-1">
-                  <div className="flex items-center gap-3">
-                    <span className={`text-xs font-extrabold w-6 h-6 rounded-full flex items-center justify-center ${
-                      idx === 0 ? 'gradient-warm text-primary-foreground' :
-                      idx === 1 ? 'bg-secondary text-foreground' :
-                      'bg-muted text-muted-foreground'
-                    }`}>{idx + 1}</span>
-                    <span className="text-sm font-medium text-foreground">{item.name}</span>
+            <h4 className="font-bold text-foreground mb-4 text-base">📋 All Bills</h4>
+            {orders.length === 0 ? (
+              <p className="text-muted-foreground text-sm text-center py-4">No bills yet</p>
+            ) : (
+              <div className="space-y-2">
+                {orders.map(order => (
+                  <div key={order.id} className="flex items-center justify-between py-2 px-3 rounded-xl hover:bg-secondary/50 transition-colors">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">{order.id}</p>
+                      <p className="text-xs text-muted-foreground">{order.customerName} • ₹{order.totalAmount}</p>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 rounded-lg" onClick={() => setPreviewOrder(order)}>
+                        <Eye className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 rounded-lg" onClick={() => handleDownloadBill(order)}>
+                        <Download className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
-                  <span className="text-sm font-bold text-primary">{item.count} sold</span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Bill Preview Dialog */}
+      <Dialog open={!!previewOrder} onOpenChange={() => setPreviewOrder(null)}>
+        <DialogContent className="max-w-md rounded-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" /> Bill Preview
+            </DialogTitle>
+          </DialogHeader>
+          {previewOrder && (
+            <div className="space-y-4">
+              <pre className="bg-secondary/50 rounded-xl p-4 text-xs font-mono whitespace-pre-wrap text-foreground overflow-x-auto">
+                {getBillText(previewOrder)}
+              </pre>
+              <div className="flex gap-2">
+                <Button className="flex-1 rounded-xl" variant="outline" onClick={() => handleDownloadBill(previewOrder)}>
+                  <Download className="h-4 w-4 mr-1" /> Download
+                </Button>
+                {!previewOrder.billSent && (
+                  <Button className="flex-1 gradient-warm text-primary-foreground rounded-xl" onClick={() => { handleSendBill(previewOrder); setPreviewOrder(null); }}>
+                    <MessageCircle className="h-4 w-4 mr-1" /> Send WhatsApp
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

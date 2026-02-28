@@ -1,20 +1,30 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { ChefHat, Crown, Eye, EyeOff } from 'lucide-react';
+import { ChefHat, Crown, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 type RoleTab = 'worker' | 'owner';
 
-const Auth = ({ onGuestAccess }: { onGuestAccess: () => void }) => {
+const Auth = () => {
+  const { user, role } = useAuth();
+  const navigate = useNavigate();
   const [roleTab, setRoleTab] = useState<RoleTab>('worker');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSignup, setIsSignup] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // If already logged in as admin, redirect to home
+  if (user && (role === 'worker' || role === 'owner')) {
+    navigate('/');
+    return null;
+  }
 
   const handleAuth = async () => {
     if (!email || !password) {
@@ -30,19 +40,19 @@ const Auth = ({ onGuestAccess }: { onGuestAccess: () => void }) => {
           options: { data: { display_name: email.split('@')[0], role: roleTab } },
         });
         if (error) throw error;
-        // Assign role after signup - use the user from signUp response
         const newUser = signUpData?.user;
         if (newUser) {
-          // Small delay to ensure session is established
           await new Promise(r => setTimeout(r, 500));
           const { error: roleError } = await (supabase as any).from('user_roles').insert({ user_id: newUser.id, role: roleTab });
           if (roleError) console.error('Role assignment error:', roleError);
         }
         toast.success('Account created! You are now logged in.');
+        navigate('/');
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         toast.success('Welcome back!');
+        navigate('/');
       }
     } catch (err: any) {
       toast.error(err.message || 'Authentication failed');
@@ -59,13 +69,18 @@ const Auth = ({ onGuestAccess }: { onGuestAccess: () => void }) => {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
+        {/* Back to menu */}
+        <Button variant="ghost" className="text-muted-foreground gap-1.5" onClick={() => navigate('/')}>
+          <ArrowLeft className="h-4 w-4" /> Back to Menu
+        </Button>
+
         {/* Brand */}
         <div className="text-center space-y-2">
-          <h1 className="text-4xl font-extrabold tracking-tight" style={{ fontFamily: 'var(--text-display)' }}>
-            <span className="gradient-warm bg-clip-text text-transparent">Order</span>
-            <span className="text-foreground">Flow</span>
+          <h1 className="text-3xl font-extrabold tracking-tight" style={{ fontFamily: 'var(--text-display)' }}>
+            <span className="gradient-warm bg-clip-text text-transparent">The Curry</span>
+            <span className="text-foreground"> Corner</span>
           </h1>
-          <p className="text-muted-foreground text-sm">Restaurant Management System</p>
+          <p className="text-muted-foreground text-sm">Admin Login</p>
         </div>
 
         {/* Role Selection */}
@@ -96,13 +111,7 @@ const Auth = ({ onGuestAccess }: { onGuestAccess: () => void }) => {
             {isSignup ? 'Create Account' : 'Sign In'} as {roleTab === 'worker' ? 'Kitchen Staff' : 'Owner'}
           </h2>
 
-          <Input
-            className="rounded-xl h-12"
-            placeholder="Email"
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-          />
+          <Input className="rounded-xl h-12" placeholder="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} />
 
           <div className="relative">
             <Input
@@ -136,25 +145,7 @@ const Auth = ({ onGuestAccess }: { onGuestAccess: () => void }) => {
               {isSignup ? 'Sign In' : 'Sign Up'}
             </button>
           </p>
-
-          <div className="text-center text-xs text-muted-foreground bg-secondary/50 rounded-xl p-3">
-            <p className="font-semibold">Default credentials:</p>
-            <p>Kitchen: <span className="text-foreground">vedant@kitchen.com</span> / <span className="text-foreground">vedant</span></p>
-            <p>Owner: <span className="text-foreground">vedant@owner.com</span> / <span className="text-foreground">vedant</span></p>
-          </div>
         </Card>
-
-        {/* Guest Access */}
-        <div className="text-center">
-          <p className="text-sm text-muted-foreground mb-3">Are you a customer?</p>
-          <Button
-            variant="outline"
-            className="rounded-xl px-8 h-11 font-semibold border-2 hover:bg-primary/5 hover:border-primary/30"
-            onClick={onGuestAccess}
-          >
-            🍽️ Browse Menu & Order
-          </Button>
-        </div>
       </div>
     </div>
   );

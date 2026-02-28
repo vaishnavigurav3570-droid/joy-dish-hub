@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { Plus, Minus, ShoppingCart, Send, PackagePlus, Flame, AlertCircle } from 'lucide-react';
+import { Plus, Minus, ShoppingCart, Send, PackagePlus, Flame, AlertCircle, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { validateIndianPhone } from '@/lib/phone';
 
@@ -14,6 +14,7 @@ const UserSection = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [tableNumber, setTableNumber] = useState('');
   const [phone, setPhone] = useState('');
+  const [customerName, setCustomerName] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
   const [showCart, setShowCart] = useState(false);
@@ -54,11 +55,12 @@ const UserSection = () => {
   };
 
   const handlePlaceOrder = () => {
+    if (!customerName.trim()) { toast.error('Please enter your name'); return; }
     if (!tableNumber) { toast.error('Please enter table number'); return; }
     const { valid, cleaned, error } = validateIndianPhone(phone);
     if (!valid) { setPhoneError(error || 'Invalid phone'); toast.error(error || 'Invalid phone number'); return; }
     if (cart.length === 0) { toast.error('Add items to your cart first'); return; }
-    const id = placeOrder(cart, parseInt(tableNumber), cleaned);
+    const id = placeOrder(cart, parseInt(tableNumber), cleaned, customerName.trim());
     setActiveOrderId(id);
     setCart([]);
     setShowCart(false);
@@ -79,14 +81,18 @@ const UserSection = () => {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold text-foreground tracking-tight">Our Menu</h2>
-          <p className="text-muted-foreground text-sm mt-1 flex items-center gap-1">
-            <Flame className="h-3.5 w-3.5 text-primary" /> Fresh & made with love
-          </p>
-        </div>
+      {/* Hero */}
+      <div className="text-center py-6 space-y-2">
+        <h2 className="text-4xl font-extrabold text-foreground tracking-tight" style={{ fontFamily: 'var(--text-display)' }}>
+          <span className="gradient-warm bg-clip-text text-transparent">Browse Menu</span>
+        </h2>
+        <p className="text-muted-foreground text-sm flex items-center justify-center gap-1">
+          <Flame className="h-3.5 w-3.5 text-primary" /> Fresh & made with love at The Curry Corner
+        </p>
+      </div>
+
+      {/* Cart Button */}
+      <div className="flex justify-end">
         <Button
           className="relative gradient-warm text-primary-foreground rounded-2xl px-5 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all"
           onClick={() => setShowCart(!showCart)}
@@ -122,7 +128,6 @@ const UserSection = () => {
           </div>
           <p className="text-sm mt-3 text-muted-foreground font-medium">
             Total: <span className="text-primary font-bold text-base">₹{activeOrder.totalAmount}</span>
-            {activeOrder.additionalRequests.length > 0 && ` (+ ${activeOrder.additionalRequests.length} added)`}
           </p>
           {isOrderConfirmed && (
             <p className="text-xs mt-2 text-accent font-semibold">✨ Order confirmed — add more items below</p>
@@ -164,6 +169,12 @@ const UserSection = () => {
 
               {!activeOrderId && (
                 <div className="space-y-3">
+                  <Input
+                    className="rounded-xl"
+                    placeholder="Your Name"
+                    value={customerName}
+                    onChange={e => setCustomerName(e.target.value)}
+                  />
                   <div className="grid grid-cols-2 gap-3">
                     <Input className="rounded-xl" placeholder="Table No." value={tableNumber} onChange={e => setTableNumber(e.target.value)} type="number" />
                     <div className="relative">

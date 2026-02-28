@@ -20,6 +20,7 @@ export interface Order {
   status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'rejected';
   createdAt: Date;
   userPhone: string;
+  customerName: string;
   totalAmount: number;
   billSent: boolean;
   additionalRequests: CartItem[];
