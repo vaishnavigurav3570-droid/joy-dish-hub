@@ -1,20 +1,7 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { MenuItem, Order, CartItem } from '@/types/order';
-
-const DEFAULT_MENU: MenuItem[] = [
-  { id: '1', name: 'Butter Chicken', price: 320, category: 'Main Course', available: true, emoji: '🍛', image: 'https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?w=400&h=300&fit=crop' },
-  { id: '2', name: 'Paneer Tikka', price: 250, category: 'Starters', available: true, emoji: '🧀', image: 'https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?w=400&h=300&fit=crop' },
-  { id: '3', name: 'Chicken Biryani', price: 280, category: 'Rice', available: true, emoji: '🍚', image: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=400&h=300&fit=crop' },
-  { id: '4', name: 'Dal Makhani', price: 200, category: 'Main Course', available: true, emoji: '🍲', image: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=400&h=300&fit=crop' },
-  { id: '5', name: 'Naan', price: 50, category: 'Breads', available: true, emoji: '🫓', image: 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400&h=300&fit=crop' },
-  { id: '6', name: 'Tandoori Roti', price: 30, category: 'Breads', available: true, emoji: '🫓', image: 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=400&h=300&fit=crop' },
-  { id: '7', name: 'Gulab Jamun', price: 100, category: 'Desserts', available: true, emoji: '🍩', image: 'https://images.unsplash.com/photo-1666190070736-c956240tried?w=400&h=300&fit=crop' },
-  { id: '8', name: 'Masala Chai', price: 40, category: 'Beverages', available: true, emoji: '☕', image: 'https://images.unsplash.com/photo-1571934811356-5cc061b6821f?w=400&h=300&fit=crop' },
-  { id: '9', name: 'Lassi', price: 80, category: 'Beverages', available: true, emoji: '🥛', image: 'https://images.unsplash.com/photo-1626200419199-391ae4be7a41?w=400&h=300&fit=crop' },
-  { id: '10', name: 'Veg Manchurian', price: 180, category: 'Starters', available: true, emoji: '🥟', image: 'https://images.unsplash.com/photo-1645177628172-a94c1f96e6db?w=400&h=300&fit=crop' },
-  { id: '11', name: 'Fish Fry', price: 300, category: 'Starters', available: false, emoji: '🐟', image: 'https://images.unsplash.com/photo-1580476262798-bddd9f4b7369?w=400&h=300&fit=crop' },
-  { id: '12', name: 'Mutton Rogan Josh', price: 400, category: 'Main Course', available: true, emoji: '🥩', image: 'https://images.unsplash.com/photo-1545247181-516773cae754?w=400&h=300&fit=crop' },
-];
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/context/AuthContext';
 
 const MOCK_SALES = [
   { date: '2026-02-19', revenue: 12400, orders: 34 },
@@ -29,8 +16,9 @@ const MOCK_SALES = [
 interface OrderContextType {
   menu: MenuItem[];
   orders: Order[];
+  menuLoading: boolean;
   toggleMenuAvailability: (id: string) => void;
-  placeOrder: (items: CartItem[], tableNumber: number, phone: string, customerName: string) => string;
+  placeOrder: (items: CartItem[], tableNumber: number, phone: string, customerName: string) => Promise<string>;
   confirmOrder: (orderId: string) => void;
   rejectOrder: (orderId: string) => void;
   markReady: (orderId: string) => void;
@@ -48,19 +36,159 @@ export const useOrders = () => {
   return ctx;
 };
 
-export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [menu, setMenu] = useState<MenuItem[]>(DEFAULT_MENU);
-  const [orders, setOrders] = useState<Order[]>([]);
+const mapMenuItem = (row: any): MenuItem => ({
+  id: row.id,
+  name: row.name,
+  price: Number(row.price),
+  category: row.category,
+  available: row.available,
+  emoji: row.emoji || '🍽️',
+  image: row.image_url || '',
+});
 
-  const toggleMenuAvailability = useCallback((id: string) => {
-    setMenu(prev => prev.map(item => item.id === id ? { ...item, available: !item.available } : item));
+const mapOrder = (row: any): Order => {
+  const orderItems: CartItem[] = [];
+  const additionalRequests: CartItem[] = [];
+
+  (row.order_items || []).forEach((oi: any) => {
+    const menuItem: MenuItem = oi.menu_items
+      ? mapMenuItem(oi.menu_items)
+      : {
+          id: oi.menu_item_id,
+          name: oi.item_name,
+          price: Number(oi.item_price),
+          category: '',
+          available: true,
+          emoji: '🍽️',
+          image: '',
+        };
+
+    const cartItem: CartItem = { menuItem, quantity: oi.quantity };
+    if (oi.is_additional) {
+      additionalRequests.push(cartItem);
+    } else {
+      orderItems.push(cartItem);
+    }
+  });
+
+  return {
+    id: row.order_number,
+    tableNumber: row.table_number,
+    items: orderItems,
+    status: row.status,
+    createdAt: new Date(row.created_at),
+    userPhone: row.customer_phone,
+    customerName: row.customer_name || '',
+    totalAmount: Number(row.total_amount),
+    billSent: row.bill_sent,
+    additionalRequests,
+  };
+};
+
+export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, role } = useAuth();
+  const [menu, setMenu] = useState<MenuItem[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [menuLoading, setMenuLoading] = useState(true);
+  const [dbOrderMap, setDbOrderMap] = useState<Record<string, string>>({});
+
+  const isAdmin = user && (role === 'worker' || role === 'owner');
+
+  // Fetch menu from DB
+  useEffect(() => {
+    const fetchMenu = async () => {
+      const { data } = await supabase.from('menu_items').select('*').order('category');
+      if (data && data.length > 0) {
+        setMenu(data.map(mapMenuItem));
+      }
+      setMenuLoading(false);
+    };
+    fetchMenu();
   }, []);
 
-  const placeOrder = useCallback((items: CartItem[], tableNumber: number, phone: string, customerName: string) => {
-    const id = `ORD-${Date.now().toString(36).toUpperCase()}`;
+  // Fetch orders from DB for admin users
+  const fetchOrders = useCallback(async () => {
+    if (!isAdmin) return;
+    const { data } = await supabase
+      .from('orders')
+      .select('*, order_items(*, menu_items(*))')
+      .order('created_at', { ascending: false });
+
+    if (data) {
+      setOrders(data.map(mapOrder));
+      const idMap: Record<string, string> = {};
+      data.forEach((row: any) => { idMap[row.order_number] = row.id; });
+      setDbOrderMap(idMap);
+    }
+  }, [isAdmin]);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+  // Realtime subscription for admin
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    const channel = supabase
+      .channel('orders-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        fetchOrders();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, () => {
+        fetchOrders();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [isAdmin, fetchOrders]);
+
+  const toggleMenuAvailability = useCallback(async (id: string) => {
+    const item = menu.find(m => m.id === id);
+    if (!item) return;
+    setMenu(prev => prev.map(m => m.id === id ? { ...m, available: !m.available } : m));
+    await supabase.from('menu_items').update({ available: !item.available }).eq('id', id);
+  }, [menu]);
+
+  const placeOrder = useCallback(async (
+    items: CartItem[], tableNumber: number, phone: string, customerName: string
+  ): Promise<string> => {
+    const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}`;
     const totalAmount = items.reduce((sum, i) => sum + i.menuItem.price * i.quantity, 0);
+
+    // Insert order into DB
+    const { data: orderData, error: orderError } = await supabase
+      .from('orders')
+      .insert({
+        order_number: orderNumber,
+        table_number: tableNumber,
+        customer_phone: phone,
+        total_amount: totalAmount,
+        status: 'pending',
+        customer_name: customerName,
+      } as any)
+      .select('id')
+      .single();
+
+    if (orderError || !orderData) {
+      console.error('Failed to create order:', orderError);
+      throw new Error('Failed to create order');
+    }
+
+    // Insert order items
+    const orderItems = items.map(i => ({
+      order_id: orderData.id,
+      menu_item_id: i.menuItem.id,
+      item_name: i.menuItem.name,
+      item_price: i.menuItem.price,
+      quantity: i.quantity,
+      is_additional: false,
+    }));
+    await supabase.from('order_items').insert(orderItems);
+
+    // Keep local state for customer view
     const order: Order = {
-      id,
+      id: orderNumber,
       tableNumber,
       items,
       status: 'pending',
@@ -72,48 +200,75 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       additionalRequests: [],
     };
     setOrders(prev => [order, ...prev]);
-    return id;
+    setDbOrderMap(prev => ({ ...prev, [orderNumber]: orderData.id }));
+
+    return orderNumber;
   }, []);
 
-  const confirmOrder = useCallback((orderId: string) => {
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'confirmed' as const } : o));
-  }, []);
+  const updateOrderStatus = useCallback(async (orderNumber: string, status: string) => {
+    setOrders(prev => prev.map(o => o.id === orderNumber ? { ...o, status: status as any } : o));
+    const dbId = dbOrderMap[orderNumber];
+    if (dbId) {
+      await supabase.from('orders').update({ status }).eq('id', dbId);
+    }
+  }, [dbOrderMap]);
 
-  const rejectOrder = useCallback((orderId: string) => {
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'rejected' as const } : o));
-  }, []);
+  const confirmOrder = useCallback((id: string) => { updateOrderStatus(id, 'confirmed'); }, [updateOrderStatus]);
+  const rejectOrder = useCallback((id: string) => { updateOrderStatus(id, 'rejected'); }, [updateOrderStatus]);
+  const markReady = useCallback((id: string) => { updateOrderStatus(id, 'ready'); }, [updateOrderStatus]);
 
-  const markReady = useCallback((orderId: string) => {
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'ready' as const } : o));
-  }, []);
+  const addMoreItems = useCallback(async (orderId: string, items: CartItem[]) => {
+    const additionalTotal = items.reduce((sum, i) => sum + i.menuItem.price * i.quantity, 0);
 
-  const addMoreItems = useCallback((orderId: string, items: CartItem[]) => {
     setOrders(prev => prev.map(o => {
       if (o.id !== orderId) return o;
-      const additionalTotal = items.reduce((sum, i) => sum + i.menuItem.price * i.quantity, 0);
       return {
         ...o,
         additionalRequests: [...o.additionalRequests, ...items],
         totalAmount: o.totalAmount + additionalTotal,
       };
     }));
-  }, []);
 
-  const markBillSent = useCallback((orderId: string) => {
+    const dbId = dbOrderMap[orderId];
+    if (dbId) {
+      const orderItems = items.map(i => ({
+        order_id: dbId,
+        menu_item_id: i.menuItem.id,
+        item_name: i.menuItem.name,
+        item_price: i.menuItem.price,
+        quantity: i.quantity,
+        is_additional: true,
+      }));
+      await supabase.from('order_items').insert(orderItems);
+
+      const order = orders.find(o => o.id === orderId);
+      if (order) {
+        await supabase.from('orders').update({ total_amount: order.totalAmount + additionalTotal }).eq('id', dbId);
+      }
+    }
+  }, [dbOrderMap, orders]);
+
+  const markBillSent = useCallback(async (orderId: string) => {
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, billSent: true } : o));
-  }, []);
+    const dbId = dbOrderMap[orderId];
+    if (dbId) {
+      await supabase.from('orders').update({ bill_sent: true }).eq('id', dbId);
+    }
+  }, [dbOrderMap]);
 
-  const topItems = [
-    { name: 'Butter Chicken', count: 156 },
-    { name: 'Chicken Biryani', count: 142 },
-    { name: 'Paneer Tikka', count: 98 },
-    { name: 'Naan', count: 234 },
-    { name: 'Masala Chai', count: 189 },
-  ];
+  const topItems = orders.length > 0 ? (() => {
+    const counts: Record<string, number> = {};
+    orders.forEach(o => {
+      [...o.items, ...o.additionalRequests].forEach(i => {
+        counts[i.menuItem.name] = (counts[i.menuItem.name] || 0) + i.quantity;
+      });
+    });
+    return Object.entries(counts).sort(([, a], [, b]) => b - a).slice(0, 5).map(([name, count]) => ({ name, count }));
+  })() : [];
 
   return (
     <OrderContext.Provider value={{
-      menu, orders, toggleMenuAvailability, placeOrder, confirmOrder,
+      menu, orders, menuLoading, toggleMenuAvailability, placeOrder, confirmOrder,
       rejectOrder, markReady, addMoreItems, markBillSent,
       salesData: MOCK_SALES, topItems,
     }}>

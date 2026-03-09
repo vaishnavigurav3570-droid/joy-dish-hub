@@ -5,12 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { Plus, Minus, ShoppingCart, Send, PackagePlus, Flame, AlertCircle, User } from 'lucide-react';
+import { Plus, Minus, ShoppingCart, Send, PackagePlus, Flame, AlertCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { validateIndianPhone } from '@/lib/phone';
 
 const UserSection = () => {
-  const { menu, orders, placeOrder, addMoreItems } = useOrders();
+  const { menu, orders, placeOrder, addMoreItems, menuLoading } = useOrders();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [tableNumber, setTableNumber] = useState('');
   const [phone, setPhone] = useState('');
@@ -18,6 +18,7 @@ const UserSection = () => {
   const [phoneError, setPhoneError] = useState('');
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
   const [showCart, setShowCart] = useState(false);
+  const [placing, setPlacing] = useState(false);
 
   const availableMenu = menu.filter(item => item.available);
   const categories = [...new Set(availableMenu.map(i => i.category))];
@@ -54,23 +55,31 @@ const UserSection = () => {
     }
   };
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
     if (!customerName.trim()) { toast.error('Please enter your name'); return; }
     if (!tableNumber) { toast.error('Please enter table number'); return; }
     const { valid, cleaned, error } = validateIndianPhone(phone);
     if (!valid) { setPhoneError(error || 'Invalid phone'); toast.error(error || 'Invalid phone number'); return; }
     if (cart.length === 0) { toast.error('Add items to your cart first'); return; }
-    const id = placeOrder(cart, parseInt(tableNumber), cleaned, customerName.trim());
-    setActiveOrderId(id);
-    setCart([]);
-    setShowCart(false);
-    toast.success(`Order ${id} placed!`);
+
+    setPlacing(true);
+    try {
+      const id = await placeOrder(cart, parseInt(tableNumber), cleaned, customerName.trim());
+      setActiveOrderId(id);
+      setCart([]);
+      setShowCart(false);
+      toast.success(`Order ${id} placed!`);
+    } catch (err) {
+      toast.error('Failed to place order. Please try again.');
+    } finally {
+      setPlacing(false);
+    }
   };
 
-  const handleRequestMore = () => {
+  const handleRequestMore = async () => {
     if (cart.length === 0) { toast.error('Add items first'); return; }
     if (activeOrderId) {
-      addMoreItems(activeOrderId, cart);
+      await addMoreItems(activeOrderId, cart);
       setCart([]);
       setShowCart(false);
       toast.success('Additional items requested!');
@@ -78,6 +87,14 @@ const UserSection = () => {
   };
 
   const getCartQty = (id: string) => cart.find(c => c.menuItem.id === id)?.quantity || 0;
+
+  if (menuLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -169,22 +186,15 @@ const UserSection = () => {
 
               {!activeOrderId && (
                 <div className="space-y-3">
-                  <Input
-                    className="rounded-xl"
-                    placeholder="Your Name"
-                    value={customerName}
-                    onChange={e => setCustomerName(e.target.value)}
-                  />
+                  <Input className="rounded-xl" placeholder="Your Name" value={customerName} onChange={e => setCustomerName(e.target.value)} />
                   <div className="grid grid-cols-2 gap-3">
                     <Input className="rounded-xl" placeholder="Table No." value={tableNumber} onChange={e => setTableNumber(e.target.value)} type="number" />
-                    <div className="relative">
-                      <Input
-                        className={`rounded-xl ${phoneError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                        placeholder="WhatsApp No."
-                        value={phone}
-                        onChange={e => handlePhoneChange(e.target.value)}
-                      />
-                    </div>
+                    <Input
+                      className={`rounded-xl ${phoneError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                      placeholder="WhatsApp No."
+                      value={phone}
+                      onChange={e => handlePhoneChange(e.target.value)}
+                    />
                   </div>
                   {phoneError && (
                     <p className="text-destructive text-xs flex items-center gap-1">
@@ -195,9 +205,13 @@ const UserSection = () => {
               )}
 
               {!isOrderConfirmed ? (
-                <Button className="w-full gradient-warm text-primary-foreground rounded-2xl h-12 text-base font-semibold shadow-lg shadow-primary/20" onClick={handlePlaceOrder} disabled={!!activeOrderId && activeOrder?.status === 'pending'}>
-                  <Send className="h-4 w-4 mr-2" />
-                  {activeOrderId ? 'Waiting for confirmation...' : 'Place Order'}
+                <Button
+                  className="w-full gradient-warm text-primary-foreground rounded-2xl h-12 text-base font-semibold shadow-lg shadow-primary/20"
+                  onClick={handlePlaceOrder}
+                  disabled={placing || (!!activeOrderId && activeOrder?.status === 'pending')}
+                >
+                  {placing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                  {placing ? 'Placing...' : activeOrderId ? 'Waiting for confirmation...' : 'Place Order'}
                 </Button>
               ) : (
                 <Button className="w-full gradient-cool text-accent-foreground rounded-2xl h-12 text-base font-semibold" onClick={handleRequestMore}>
@@ -221,12 +235,16 @@ const UserSection = () => {
               return (
                 <Card key={item.id} className="overflow-hidden rounded-2xl hover:food-card-shadow transition-all duration-300 group cursor-pointer border-border/50 hover:border-primary/30 hover:-translate-y-1" onClick={() => addToCart(item)}>
                   <div className="relative h-32 overflow-hidden">
-                    <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = 'none';
-                        target.parentElement!.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-secondary text-4xl">${item.emoji}</div>`;
-                      }} />
+                    {item.image ? (
+                      <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          target.parentElement!.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-secondary text-4xl">${item.emoji}</div>`;
+                        }} />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-secondary text-4xl">{item.emoji}</div>
+                    )}
                     {qty > 0 && (
                       <div className="absolute top-2 right-2 gradient-warm text-primary-foreground text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg">{qty}</div>
                     )}
