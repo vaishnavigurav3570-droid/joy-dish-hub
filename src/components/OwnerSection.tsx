@@ -255,9 +255,9 @@ const OwnerSection = () => {
                   <Download className="h-4 w-4 mr-1" /> Download
                 </Button>
                 {!previewOrder.billSent && (
-                  <Button className="flex-1 gradient-warm text-primary-foreground rounded-xl" onClick={() => { handleSendBill(previewOrder); setPreviewOrder(null); }}>
-                    <MessageCircle className="h-4 w-4 mr-1" /> Send WhatsApp
-                  </Button>
+                  <div className="flex-1">
+                    <SendWhatsAppBill order={previewOrder} onBillSent={() => { markBillSent(previewOrder.id); setPreviewOrder(null); }} />
+                  </div>
                 )}
               </div>
             </div>
