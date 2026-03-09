@@ -44,13 +44,6 @@ const OwnerSection = () => {
     toast.success('Bill downloaded!');
   };
 
-  const handleSendBill = (order: Order) => {
-    const items = getOrderItems(order);
-    const whatsappLink = generateWhatsAppBillLink(order.userPhone, order.id, items, order.totalAmount, order.customerName);
-    window.open(whatsappLink, '_blank');
-    markBillSent(order.id);
-    toast.success(`Bill sent to ${order.userPhone} via WhatsApp!`);
-  };
 
   return (
     <div className="space-y-6">
