@@ -17,17 +17,17 @@ const ADMIN_TABS = [
 type TabId = 'worker' | 'owner';
 
 const Index = () => {
-  const { user, role, isGuest, loading, setGuestMode, signOut } = useAuth();
+  const { user, role, isGuest, loading, roleLoading, setGuestMode, signOut } = useAuth();
   const navigate = useNavigate();
 
   // If not logged in and not guest, auto-set guest mode (customer-first)
   useEffect(() => {
-    if (!loading && !user && !isGuest) {
+    if (!loading && !roleLoading && !user && !isGuest) {
       setGuestMode(true);
     }
-  }, [loading, user, isGuest, setGuestMode]);
+  }, [loading, roleLoading, user, isGuest, setGuestMode]);
 
-  if (loading) {
+  if (loading || roleLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-3">

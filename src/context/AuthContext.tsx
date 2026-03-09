@@ -10,6 +10,7 @@ interface AuthContextType {
   role: AppRole;
   isGuest: boolean;
   loading: boolean;
+  roleLoading: boolean;
   setGuestMode: (v: boolean) => void;
   signOut: () => Promise<void>;
 }
@@ -28,8 +29,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [role, setRole] = useState<AppRole>('user');
   const [isGuest, setIsGuest] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [roleLoading, setRoleLoading] = useState(false);
 
   const fetchRole = useCallback(async (userId: string) => {
+    setRoleLoading(true);
     try {
       const { data } = await (supabase as any).from('user_roles').select('role').eq('user_id', userId).maybeSingle();
       if (data?.role) {
@@ -39,6 +42,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch {
       setRole('user');
+    } finally {
+      setRoleLoading(false);
     }
   }, []);
 
@@ -112,7 +117,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, role, isGuest, loading, setGuestMode, signOut }}>
+    <AuthContext.Provider value={{ user, session, role, isGuest, loading, roleLoading, setGuestMode, signOut }}>
       {children}
     </AuthContext.Provider>
   );
