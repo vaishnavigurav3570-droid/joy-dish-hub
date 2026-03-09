@@ -142,9 +142,7 @@ const OwnerSection = () => {
                     </div>
                   </div>
                   {!order.billSent ? (
-                    <Button size="sm" className="w-full gradient-warm text-primary-foreground rounded-xl font-semibold" onClick={() => handleSendBill(order)}>
-                      <MessageCircle className="h-3 w-3 mr-1" /> Send Bill via WhatsApp
-                    </Button>
+                    <SendWhatsAppBill order={order} onBillSent={() => markBillSent(order.id)} />
                   ) : (
                     <Badge className="rounded-full bg-accent/15 text-accent border-accent/30 font-semibold w-full justify-center py-1.5">✅ Bill Sent</Badge>
                   )}
