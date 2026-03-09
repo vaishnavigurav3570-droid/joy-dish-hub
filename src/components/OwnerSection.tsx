@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Send, TrendingUp, UtensilsCrossed, BarChart3, Zap, MessageCircle, FileText, Download, Eye, X } from 'lucide-react';
+import { TrendingUp, UtensilsCrossed, BarChart3, Zap, FileText, Download, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { generateBillText } from '@/lib/phone';
