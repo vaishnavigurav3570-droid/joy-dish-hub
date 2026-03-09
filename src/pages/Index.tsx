@@ -27,7 +27,7 @@ const Index = () => {
     }
   }, [loading, roleLoading, user, isGuest, setGuestMode]);
 
-  if (loading) {
+  if (loading || roleLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-3">
