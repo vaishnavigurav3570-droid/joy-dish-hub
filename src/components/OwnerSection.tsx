@@ -9,8 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Send, TrendingUp, UtensilsCrossed, BarChart3, Zap, MessageCircle, FileText, Download, Eye, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { generateWhatsAppBillLink, generateBillText } from '@/lib/phone';
+import { generateBillText } from '@/lib/phone';
 import { Order } from '@/types/order';
+import SendWhatsAppBill from './SendWhatsAppBill';
 
 const OwnerSection = () => {
   const { orders, menu, toggleMenuAvailability, markBillSent, salesData, topItems } = useOrders();
