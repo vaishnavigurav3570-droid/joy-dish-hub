@@ -6,11 +6,12 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Send, TrendingUp, UtensilsCrossed, BarChart3, Zap, MessageCircle, FileText, Download, Eye, X } from 'lucide-react';
+import { TrendingUp, UtensilsCrossed, BarChart3, Zap, FileText, Download, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { generateWhatsAppBillLink, generateBillText } from '@/lib/phone';
+import { generateBillText } from '@/lib/phone';
 import { Order } from '@/types/order';
+import SendWhatsAppBill from './SendWhatsAppBill';
 
 const OwnerSection = () => {
   const { orders, menu, toggleMenuAvailability, markBillSent, salesData, topItems } = useOrders();
@@ -43,13 +44,6 @@ const OwnerSection = () => {
     toast.success('Bill downloaded!');
   };
 
-  const handleSendBill = (order: Order) => {
-    const items = getOrderItems(order);
-    const whatsappLink = generateWhatsAppBillLink(order.userPhone, order.id, items, order.totalAmount, order.customerName);
-    window.open(whatsappLink, '_blank');
-    markBillSent(order.id);
-    toast.success(`Bill sent to ${order.userPhone} via WhatsApp!`);
-  };
 
   return (
     <div className="space-y-6">
@@ -148,9 +142,7 @@ const OwnerSection = () => {
                     </div>
                   </div>
                   {!order.billSent ? (
-                    <Button size="sm" className="w-full gradient-warm text-primary-foreground rounded-xl font-semibold" onClick={() => handleSendBill(order)}>
-                      <MessageCircle className="h-3 w-3 mr-1" /> Send Bill via WhatsApp
-                    </Button>
+                    <SendWhatsAppBill order={order} onBillSent={() => markBillSent(order.id)} />
                   ) : (
                     <Badge className="rounded-full bg-accent/15 text-accent border-accent/30 font-semibold w-full justify-center py-1.5">✅ Bill Sent</Badge>
                   )}
@@ -263,9 +255,9 @@ const OwnerSection = () => {
                   <Download className="h-4 w-4 mr-1" /> Download
                 </Button>
                 {!previewOrder.billSent && (
-                  <Button className="flex-1 gradient-warm text-primary-foreground rounded-xl" onClick={() => { handleSendBill(previewOrder); setPreviewOrder(null); }}>
-                    <MessageCircle className="h-4 w-4 mr-1" /> Send WhatsApp
-                  </Button>
+                  <div className="flex-1">
+                    <SendWhatsAppBill order={previewOrder} onBillSent={() => { markBillSent(previewOrder.id); setPreviewOrder(null); }} />
+                  </div>
                 )}
               </div>
             </div>
