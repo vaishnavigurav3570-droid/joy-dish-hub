@@ -10,6 +10,7 @@ interface AuthContextType {
   role: AppRole;
   isGuest: boolean;
   loading: boolean;
+  roleLoading: boolean;
   setGuestMode: (v: boolean) => void;
   signOut: () => Promise<void>;
 }
