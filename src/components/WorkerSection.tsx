@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Check, X, ChefHat, Clock, Flame } from 'lucide-react';
 import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const WorkerSection = () => {
   const { orders, confirmOrder, rejectOrder, markReady } = useOrders();
@@ -14,7 +15,7 @@ const WorkerSection = () => {
 
   const handleConfirm = (id: string) => {
     confirmOrder(id);
-    toast.success('Order confirmed!');
+    toast.success('Order confirmed! 👨‍🍳');
   };
 
   const handleReject = (id: string) => {
@@ -24,40 +25,42 @@ const WorkerSection = () => {
 
   const handleReady = (id: string) => {
     markReady(id);
-    toast.success('Order marked as ready!');
+    toast.success('Order ready to serve! ✅');
   };
 
   return (
     <div className="space-y-8">
-      <div>
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
         <h2 className="text-3xl font-bold text-foreground tracking-tight">Kitchen</h2>
         <p className="text-muted-foreground text-sm mt-1">Manage incoming orders in real-time</p>
-      </div>
+      </motion.div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
-        <Card className="p-4 text-center rounded-2xl border-warning/20 bg-gradient-to-br from-warning/5 to-warning/10">
-          <div className="flex items-center justify-center gap-1.5 mb-1">
-            <Clock className="h-3.5 w-3.5 text-warning" />
-          </div>
-          <p className="text-3xl font-extrabold text-warning">{pendingOrders.length}</p>
-          <p className="text-[10px] text-muted-foreground mt-1 font-medium uppercase tracking-wider">Pending</p>
-        </Card>
-        <Card className="p-4 text-center rounded-2xl border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 stat-glow">
-          <div className="flex items-center justify-center gap-1.5 mb-1">
-            <Flame className="h-3.5 w-3.5 text-primary" />
-          </div>
-          <p className="text-3xl font-extrabold text-primary">{activeOrders.length}</p>
-          <p className="text-[10px] text-muted-foreground mt-1 font-medium uppercase tracking-wider">Cooking</p>
-        </Card>
-        <Card className="p-4 text-center rounded-2xl border-accent/20 bg-gradient-to-br from-accent/5 to-accent/10">
-          <div className="flex items-center justify-center gap-1.5 mb-1">
-            <Check className="h-3.5 w-3.5 text-accent" />
-          </div>
-          <p className="text-3xl font-extrabold text-accent">{readyOrders.length}</p>
-          <p className="text-[10px] text-muted-foreground mt-1 font-medium uppercase tracking-wider">Ready</p>
-        </Card>
-      </div>
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="grid grid-cols-3 gap-3"
+      >
+        {[
+          { count: pendingOrders.length, label: 'Pending', color: 'warning', icon: Clock },
+          { count: activeOrders.length, label: 'Cooking', color: 'primary', icon: Flame },
+          { count: readyOrders.length, label: 'Ready', color: 'accent', icon: Check },
+        ].map(stat => (
+          <Card key={stat.label} className={`p-4 text-center rounded-2xl border-${stat.color}/20 bg-gradient-to-br from-${stat.color}/5 to-${stat.color}/10`}>
+            <stat.icon className={`h-4 w-4 text-${stat.color} mx-auto mb-1`} />
+            <motion.p
+              key={stat.count}
+              initial={{ scale: 1.3 }}
+              animate={{ scale: 1 }}
+              className={`text-3xl font-extrabold text-${stat.color}`}
+            >
+              {stat.count}
+            </motion.p>
+            <p className="text-[10px] text-muted-foreground mt-1 font-medium uppercase tracking-wider">{stat.label}</p>
+          </Card>
+        ))}
+      </motion.div>
 
       {/* Pending Orders */}
       {pendingOrders.length > 0 && (
@@ -67,35 +70,44 @@ const WorkerSection = () => {
             New Orders
           </h3>
           <div className="space-y-3">
-            {pendingOrders.map(order => (
-              <Card key={order.id} className="p-5 rounded-2xl border-l-4 border-l-warning bg-gradient-to-r from-warning/5 to-transparent">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <p className="font-bold text-foreground text-base">{order.id}</p>
-                    <p className="text-sm text-muted-foreground">Table {order.tableNumber} • {order.createdAt.toLocaleTimeString()}</p>
-                  </div>
-                  <Badge className="bg-secondary text-foreground font-bold rounded-full px-3">₹{order.totalAmount}</Badge>
-                </div>
-                <div className="space-y-1.5 mb-4">
-                  {order.items.map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-2 text-sm text-foreground">
-                      <img src={item.menuItem.image} alt="" className="w-6 h-6 rounded-lg object-cover"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                      <span>{item.menuItem.name}</span>
-                      <span className="text-muted-foreground">× {item.quantity}</span>
+            <AnimatePresence>
+              {pendingOrders.map(order => (
+                <motion.div
+                  key={order.id}
+                  initial={{ opacity: 0, x: -30 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 30, height: 0 }}
+                  layout
+                >
+                  <Card className="p-5 rounded-2xl border-l-4 border-l-warning bg-gradient-to-r from-warning/5 to-transparent">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <p className="font-bold text-foreground text-base">{order.id}</p>
+                        <p className="text-sm text-muted-foreground">Table {order.tableNumber} • {order.customerName} • {order.createdAt.toLocaleTimeString()}</p>
+                      </div>
+                      <Badge className="bg-secondary text-foreground font-bold rounded-full px-3">₹{order.totalAmount}</Badge>
                     </div>
-                  ))}
-                </div>
-                <div className="flex gap-2">
-                  <Button className="flex-1 gradient-cool text-accent-foreground rounded-xl font-semibold" onClick={() => handleConfirm(order.id)}>
-                    <Check className="h-4 w-4 mr-1" /> Accept
-                  </Button>
-                  <Button variant="destructive" className="flex-1 rounded-xl font-semibold" onClick={() => handleReject(order.id)}>
-                    <X className="h-4 w-4 mr-1" /> Reject
-                  </Button>
-                </div>
-              </Card>
-            ))}
+                    <div className="space-y-1.5 mb-4">
+                      {order.items.map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-sm text-foreground">
+                          <span className="text-base">{item.menuItem.emoji}</span>
+                          <span className="font-medium">{item.menuItem.name}</span>
+                          <span className="text-muted-foreground">× {item.quantity}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button className="flex-1 gradient-cool text-accent-foreground rounded-xl font-semibold h-11" onClick={() => handleConfirm(order.id)}>
+                        <Check className="h-4 w-4 mr-1" /> Accept
+                      </Button>
+                      <Button variant="destructive" className="flex-1 rounded-xl font-semibold h-11" onClick={() => handleReject(order.id)}>
+                        <X className="h-4 w-4 mr-1" /> Reject
+                      </Button>
+                    </div>
+                  </Card>
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </div>
         </div>
       )}
@@ -108,43 +120,51 @@ const WorkerSection = () => {
             Cooking Now
           </h3>
           <div className="space-y-3">
-            {activeOrders.map(order => (
-              <Card key={order.id} className="p-5 rounded-2xl border-l-4 border-l-primary bg-gradient-to-r from-primary/5 to-transparent">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <p className="font-bold text-foreground">{order.id}</p>
-                    <p className="text-sm text-muted-foreground">Table {order.tableNumber}</p>
-                  </div>
-                  <Badge className="gradient-warm text-primary-foreground rounded-full px-3">₹{order.totalAmount}</Badge>
-                </div>
-                <div className="space-y-1.5 mb-2">
-                  {order.items.map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-2 text-sm text-foreground">
-                      <img src={item.menuItem.image} alt="" className="w-6 h-6 rounded-lg object-cover"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                      <span>{item.menuItem.name}</span>
-                      <span className="text-muted-foreground">× {item.quantity}</span>
+            <AnimatePresence>
+              {activeOrders.map(order => (
+                <motion.div
+                  key={order.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, height: 0 }}
+                  layout
+                >
+                  <Card className="p-5 rounded-2xl border-l-4 border-l-primary bg-gradient-to-r from-primary/5 to-transparent">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <p className="font-bold text-foreground">{order.id}</p>
+                        <p className="text-sm text-muted-foreground">Table {order.tableNumber} • {order.customerName}</p>
+                      </div>
+                      <Badge className="gradient-warm text-primary-foreground rounded-full px-3">₹{order.totalAmount}</Badge>
                     </div>
-                  ))}
-                  {order.additionalRequests.length > 0 && (
-                    <>
-                      <p className="text-xs font-semibold text-primary mt-2">+ Additional:</p>
-                      {order.additionalRequests.map((item, idx) => (
-                        <div key={`add-${idx}`} className="flex items-center gap-2 text-sm text-foreground">
-                          <img src={item.menuItem.image} alt="" className="w-6 h-6 rounded-lg object-cover"
-                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    <div className="space-y-1.5 mb-2">
+                      {order.items.map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-sm text-foreground">
+                          <span className="text-base">{item.menuItem.emoji}</span>
                           <span>{item.menuItem.name}</span>
                           <span className="text-muted-foreground">× {item.quantity}</span>
                         </div>
                       ))}
-                    </>
-                  )}
-                </div>
-                <Button className="w-full mt-3 rounded-xl font-semibold gradient-cool text-accent-foreground" onClick={() => handleReady(order.id)}>
-                  <Check className="h-4 w-4 mr-1" /> Mark Ready
-                </Button>
-              </Card>
-            ))}
+                      {order.additionalRequests.length > 0 && (
+                        <>
+                          <p className="text-xs font-semibold text-primary mt-2">+ Additional:</p>
+                          {order.additionalRequests.map((item, idx) => (
+                            <div key={`add-${idx}`} className="flex items-center gap-2 text-sm text-primary">
+                              <span className="text-base">{item.menuItem.emoji}</span>
+                              <span>{item.menuItem.name}</span>
+                              <span className="text-muted-foreground">× {item.quantity}</span>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                    <Button className="w-full mt-3 rounded-xl font-semibold h-11 gradient-cool text-accent-foreground" onClick={() => handleReady(order.id)}>
+                      <Check className="h-4 w-4 mr-1" /> Mark Ready
+                    </Button>
+                  </Card>
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </div>
         </div>
       )}
@@ -155,21 +175,32 @@ const WorkerSection = () => {
           <h3 className="font-bold text-foreground mb-3 text-lg">✅ Ready to Serve</h3>
           <div className="space-y-3">
             {readyOrders.map(order => (
-              <Card key={order.id} className="p-4 rounded-2xl border-l-4 border-l-accent bg-gradient-to-r from-accent/5 to-transparent opacity-80">
-                <p className="font-bold text-foreground">{order.id} — Table {order.tableNumber}</p>
-                <p className="text-sm text-muted-foreground font-medium">₹{order.totalAmount}</p>
-              </Card>
+              <motion.div key={order.id} layout>
+                <Card className="p-4 rounded-2xl border-l-4 border-l-accent bg-gradient-to-r from-accent/5 to-transparent">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-foreground">{order.id}</p>
+                      <p className="text-sm text-muted-foreground">Table {order.tableNumber} • {order.customerName}</p>
+                    </div>
+                    <Badge className="gradient-cool text-accent-foreground rounded-full px-3 font-bold">₹{order.totalAmount}</Badge>
+                  </div>
+                </Card>
+              </motion.div>
             ))}
           </div>
         </div>
       )}
 
       {orders.length === 0 && (
-        <div className="text-center py-20 text-muted-foreground">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center py-20 text-muted-foreground"
+        >
           <ChefHat className="h-16 w-16 mx-auto mb-4 opacity-20" />
           <p className="text-lg font-medium">No orders yet</p>
           <p className="text-sm">Waiting for customers to place orders...</p>
-        </div>
+        </motion.div>
       )}
     </div>
   );
