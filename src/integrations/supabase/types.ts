@@ -102,6 +102,7 @@ export type Database = {
         Row: {
           bill_sent: boolean
           created_at: string
+          customer_name: string | null
           customer_phone: string
           customer_user_id: string | null
           id: string
@@ -115,6 +116,7 @@ export type Database = {
         Insert: {
           bill_sent?: boolean
           created_at?: string
+          customer_name?: string | null
           customer_phone: string
           customer_user_id?: string | null
           id?: string
@@ -128,6 +130,7 @@ export type Database = {
         Update: {
           bill_sent?: boolean
           created_at?: string
+          customer_name?: string | null
           customer_phone?: string
           customer_user_id?: string | null
           id?: string
