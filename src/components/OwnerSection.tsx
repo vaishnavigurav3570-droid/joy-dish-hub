@@ -6,12 +6,13 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { TrendingUp, UtensilsCrossed, BarChart3, Zap, FileText, Download, Eye } from 'lucide-react';
+import { TrendingUp, UtensilsCrossed, BarChart3, Zap, FileText, Download, Eye, IndianRupee, ShoppingBag } from 'lucide-react';
 import { toast } from 'sonner';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { generateBillText } from '@/lib/phone';
 import { Order } from '@/types/order';
 import SendWhatsAppBill from './SendWhatsAppBill';
+import BillReceipt from './BillReceipt';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const OwnerSection = () => {
   const { orders, menu, toggleMenuAvailability, markBillSent, salesData, topItems } = useOrders();
@@ -21,6 +22,7 @@ const OwnerSection = () => {
   const liveOrders = orders.filter(o => o.status !== 'rejected');
   const totalRevenue = orders.reduce((sum, o) => sum + o.totalAmount, 0);
   const totalOrders = orders.length;
+  const pendingCount = orders.filter(o => o.status === 'pending').length;
 
   const getOrderItems = (order: Order) => [
     ...order.items.map(i => ({ name: i.menuItem.name, qty: i.quantity, price: i.menuItem.price })),
@@ -44,27 +46,38 @@ const OwnerSection = () => {
     toast.success('Bill downloaded!');
   };
 
-
   return (
     <div className="space-y-6">
-      <div>
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
         <h2 className="text-3xl font-bold text-foreground tracking-tight">Dashboard</h2>
         <p className="text-muted-foreground text-sm mt-1 flex items-center gap-1">
           <Zap className="h-3.5 w-3.5 text-primary" /> The Curry Corner — command center
         </p>
-      </div>
+      </motion.div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-2 gap-4">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="grid grid-cols-3 gap-3"
+      >
         <Card className="p-4 rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10 border-primary/15 stat-glow">
-          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Revenue</p>
-          <p className="text-2xl font-extrabold text-foreground mt-1">₹{totalRevenue.toLocaleString()}</p>
+          <IndianRupee className="h-4 w-4 text-primary mb-1" />
+          <p className="text-2xl font-extrabold text-foreground">₹{totalRevenue.toLocaleString()}</p>
+          <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Revenue</p>
         </Card>
         <Card className="p-4 rounded-2xl bg-gradient-to-br from-accent/5 to-accent/10 border-accent/15">
-          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Orders</p>
-          <p className="text-2xl font-extrabold text-foreground mt-1">{totalOrders}</p>
+          <ShoppingBag className="h-4 w-4 text-accent mb-1" />
+          <p className="text-2xl font-extrabold text-foreground">{totalOrders}</p>
+          <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Orders</p>
         </Card>
-      </div>
+        <Card className="p-4 rounded-2xl bg-gradient-to-br from-warning/5 to-warning/10 border-warning/15">
+          <TrendingUp className="h-4 w-4 text-warning mb-1" />
+          <p className="text-2xl font-extrabold text-foreground">{pendingCount}</p>
+          <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Pending</p>
+        </Card>
+      </motion.div>
 
       <Tabs value={ownerTab} onValueChange={setOwnerTab}>
         <TabsList className="w-full grid grid-cols-3 rounded-2xl bg-secondary/80 p-1 h-auto">
@@ -82,85 +95,97 @@ const OwnerSection = () => {
         {/* Live Orders */}
         <TabsContent value="orders" className="space-y-4 mt-6">
           {liveOrders.length === 0 ? (
-            <div className="text-center py-20 text-muted-foreground">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-20 text-muted-foreground">
               <UtensilsCrossed className="h-16 w-16 mx-auto mb-4 opacity-20" />
               <p className="text-lg font-medium">No active orders</p>
               <p className="text-sm">Orders will appear here in real-time</p>
-            </div>
+            </motion.div>
           ) : (
-            liveOrders.map(order => (
-              <Card key={order.id} className="p-5 rounded-2xl hover:food-card-shadow transition-all">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <p className="font-bold text-foreground text-base">{order.id}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Table {order.tableNumber} • {order.customerName} • {order.userPhone}
-                    </p>
-                  </div>
-                  <Badge className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                    order.status === 'pending' ? 'bg-warning/15 text-warning' :
-                    order.status === 'confirmed' ? 'gradient-warm text-primary-foreground' :
-                    order.status === 'ready' ? 'gradient-cool text-accent-foreground' : 'bg-secondary text-foreground'
-                  }`}>
-                    {order.status}
-                  </Badge>
-                </div>
+            <AnimatePresence>
+              {liveOrders.map((order, idx) => (
+                <motion.div
+                  key={order.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  layout
+                >
+                  <Card className="p-5 rounded-2xl hover:food-card-shadow transition-all">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <p className="font-bold text-foreground text-base">{order.id}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Table {order.tableNumber} • {order.customerName} • {order.userPhone}
+                        </p>
+                      </div>
+                      <Badge className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        order.status === 'pending' ? 'bg-warning/15 text-warning' :
+                        order.status === 'confirmed' ? 'gradient-warm text-primary-foreground' :
+                        order.status === 'ready' ? 'gradient-cool text-accent-foreground' : 'bg-secondary text-foreground'
+                      }`}>
+                        {order.status}
+                      </Badge>
+                    </div>
 
-                <div className="space-y-1.5 mb-3">
-                  {order.items.map((item, idx) => (
-                    <div key={idx} className="flex justify-between text-sm">
-                      <span className="text-foreground flex items-center gap-2">
-                        <img src={item.menuItem.image} alt="" className="w-5 h-5 rounded object-cover"
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                        {item.menuItem.name} × {item.quantity}
-                      </span>
-                      <span className="text-muted-foreground">₹{item.menuItem.price * item.quantity}</span>
+                    <div className="space-y-1.5 mb-3">
+                      {order.items.map((item, idx) => (
+                        <div key={idx} className="flex justify-between text-sm">
+                          <span className="text-foreground flex items-center gap-2">
+                            <span>{item.menuItem.emoji}</span>
+                            {item.menuItem.name} × {item.quantity}
+                          </span>
+                          <span className="text-muted-foreground">₹{item.menuItem.price * item.quantity}</span>
+                        </div>
+                      ))}
+                      {order.additionalRequests.map((item, idx) => (
+                        <div key={`add-${idx}`} className="flex justify-between text-sm">
+                          <span className="text-primary flex items-center gap-2">
+                            <span>{item.menuItem.emoji}</span>
+                            {item.menuItem.name} × {item.quantity} <span className="text-[10px]">(added)</span>
+                          </span>
+                          <span className="text-muted-foreground">₹{item.menuItem.price * item.quantity}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                  {order.additionalRequests.map((item, idx) => (
-                    <div key={`add-${idx}`} className="flex justify-between text-sm">
-                      <span className="text-primary flex items-center gap-2">
-                        <img src={item.menuItem.image} alt="" className="w-5 h-5 rounded object-cover"
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                        {item.menuItem.name} × {item.quantity} <span className="text-[10px]">(added)</span>
-                      </span>
-                      <span className="text-muted-foreground">₹{item.menuItem.price * item.quantity}</span>
-                    </div>
-                  ))}
-                </div>
 
-                <div className="border-t border-border/50 pt-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="font-bold text-foreground text-lg">₹{order.totalAmount}</p>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" className="rounded-xl text-xs" onClick={() => setPreviewOrder(order)}>
-                        <Eye className="h-3 w-3 mr-1" /> Preview
-                      </Button>
-                      <Button size="sm" variant="outline" className="rounded-xl text-xs" onClick={() => handleDownloadBill(order)}>
-                        <Download className="h-3 w-3 mr-1" /> Download
-                      </Button>
+                    <div className="border-t border-border/50 pt-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="font-bold text-foreground text-lg">₹{order.totalAmount}</p>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" className="rounded-xl text-xs" onClick={() => setPreviewOrder(order)}>
+                            <Eye className="h-3 w-3 mr-1" /> Preview
+                          </Button>
+                          <Button size="sm" variant="outline" className="rounded-xl text-xs" onClick={() => handleDownloadBill(order)}>
+                            <Download className="h-3 w-3 mr-1" /> Download
+                          </Button>
+                        </div>
+                      </div>
+                      {!order.billSent ? (
+                        <SendWhatsAppBill order={order} onBillSent={() => markBillSent(order.id)} />
+                      ) : (
+                        <Badge className="rounded-full bg-accent/15 text-accent border-accent/30 font-semibold w-full justify-center py-1.5">✅ Bill Sent</Badge>
+                      )}
                     </div>
-                  </div>
-                  {!order.billSent ? (
-                    <SendWhatsAppBill order={order} onBillSent={() => markBillSent(order.id)} />
-                  ) : (
-                    <Badge className="rounded-full bg-accent/15 text-accent border-accent/30 font-semibold w-full justify-center py-1.5">✅ Bill Sent</Badge>
-                  )}
-                </div>
-              </Card>
-            ))
+                  </Card>
+                </motion.div>
+              ))}
+            </AnimatePresence>
           )}
         </TabsContent>
 
         {/* Menu Management */}
         <TabsContent value="menu" className="space-y-2 mt-6">
           <p className="text-sm text-muted-foreground mb-4 font-medium">Toggle item availability for today</p>
-          {menu.map(item => (
-            <div key={item.id} className="flex items-center justify-between py-3 px-4 rounded-xl hover:bg-secondary/50 transition-colors border-b border-border/30 last:border-0">
+          {menu.map((item, idx) => (
+            <motion.div
+              key={item.id}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: idx * 0.03 }}
+              className="flex items-center justify-between py-3 px-4 rounded-xl hover:bg-secondary/50 transition-colors border-b border-border/30 last:border-0"
+            >
               <div className="flex items-center gap-3">
-                <img src={item.image} alt={item.name}
-                  className={`w-10 h-10 rounded-xl object-cover ${!item.available ? 'opacity-40 grayscale' : ''}`}
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                <span className={`text-2xl ${!item.available ? 'opacity-40 grayscale' : ''}`}>{item.emoji}</span>
                 <div>
                   <p className={`font-semibold text-sm ${item.available ? 'text-foreground' : 'text-muted-foreground line-through'}`}>
                     {item.name}
@@ -169,11 +194,11 @@ const OwnerSection = () => {
                 </div>
               </div>
               <Switch checked={item.available} onCheckedChange={() => toggleMenuAvailability(item.id)} />
-            </div>
+            </motion.div>
           ))}
         </TabsContent>
 
-        {/* Analytics — uses real order data */}
+        {/* Analytics */}
         <TabsContent value="analytics" className="space-y-6 mt-6">
           <Card className="p-5 rounded-2xl">
             <h4 className="font-bold text-foreground mb-4 text-base">🏆 Most Ordered Items</h4>
@@ -192,17 +217,33 @@ const OwnerSection = () => {
                     .sort(([,a], [,b]) => b - a)
                     .slice(0, 5)
                     .map(([name, count], idx) => (
-                      <div key={name} className="flex items-center justify-between py-1">
+                      <motion.div
+                        key={name}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: idx * 0.1 }}
+                        className="flex items-center justify-between py-2"
+                      >
                         <div className="flex items-center gap-3">
-                          <span className={`text-xs font-extrabold w-6 h-6 rounded-full flex items-center justify-center ${
+                          <span className={`text-xs font-extrabold w-7 h-7 rounded-full flex items-center justify-center ${
                             idx === 0 ? 'gradient-warm text-primary-foreground' :
                             idx === 1 ? 'bg-secondary text-foreground' :
                             'bg-muted text-muted-foreground'
                           }`}>{idx + 1}</span>
                           <span className="text-sm font-medium text-foreground">{name}</span>
                         </div>
-                        <span className="text-sm font-bold text-primary">{count} ordered</span>
-                      </div>
+                        <div className="flex items-center gap-2">
+                          <div className="h-2 rounded-full bg-primary/20 w-20">
+                            <motion.div
+                              initial={{ width: 0 }}
+                              animate={{ width: `${Math.min(100, (count / Math.max(...Object.values(counts))) * 100)}%` }}
+                              transition={{ delay: 0.5 + idx * 0.1, duration: 0.5 }}
+                              className="h-full rounded-full gradient-warm"
+                            />
+                          </div>
+                          <span className="text-sm font-bold text-primary w-12 text-right">{count}</span>
+                        </div>
+                      </motion.div>
                     ));
                 })()}
               </div>
@@ -237,7 +278,7 @@ const OwnerSection = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Bill Preview Dialog */}
+      {/* Bill Preview Dialog — shows visual receipt */}
       <Dialog open={!!previewOrder} onOpenChange={() => setPreviewOrder(null)}>
         <DialogContent className="max-w-md rounded-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -247,9 +288,9 @@ const OwnerSection = () => {
           </DialogHeader>
           {previewOrder && (
             <div className="space-y-4">
-              <pre className="bg-secondary/50 rounded-xl p-4 text-xs font-mono whitespace-pre-wrap text-foreground overflow-x-auto">
-                {getBillText(previewOrder)}
-              </pre>
+              <div className="flex justify-center">
+                <BillReceipt order={previewOrder} />
+              </div>
               <div className="flex gap-2">
                 <Button className="flex-1 rounded-xl" variant="outline" onClick={() => handleDownloadBill(previewOrder)}>
                   <Download className="h-4 w-4 mr-1" /> Download
