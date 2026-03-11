@@ -1,17 +1,21 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useOrders } from '@/context/OrderContext';
-import { CartItem } from '@/types/order';
+import { useAuth } from '@/context/AuthContext';
+import { CartItem, OrderType } from '@/types/order';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { Plus, Minus, ShoppingCart, Send, PackagePlus, Flame, AlertCircle, Loader2, X } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Plus, Minus, ShoppingCart, Send, PackagePlus, Flame, AlertCircle, Loader2, X, MapPin, Clock, CheckCircle2, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { validateIndianPhone } from '@/lib/phone';
 import { motion, AnimatePresence } from 'framer-motion';
+import OTPModal from './OTPModal';
 
 const UserSection = () => {
   const { menu, orders, placeOrder, addMoreItems, menuLoading } = useOrders();
+  const { user } = useAuth();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [tableNumber, setTableNumber] = useState('');
   const [phone, setPhone] = useState('');
@@ -21,6 +25,24 @@ const UserSection = () => {
   const [showCart, setShowCart] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [orderType, setOrderType] = useState<OrderType>('dine-in');
+  const [showOTPModal, setShowOTPModal] = useState(false);
+  const [successPin, setSuccessPin] = useState<string | null>(null);
+  const [successOrderId, setSuccessOrderId] = useState<string | null>(null);
+
+  // Auto-fill from authenticated user session
+  useEffect(() => {
+    if (user) {
+      const meta = user.user_metadata;
+      if (meta?.full_name) setCustomerName(meta.full_name);
+      if (user.phone) {
+        const digits = user.phone.replace(/^\+91/, '').replace(/\D/g, '');
+        setPhone(digits);
+      }
+    }
+  }, [user]);
+
+  const isAuthed = !!user;
 
   const availableMenu = menu.filter(item => item.available);
   const categories = [...new Set(availableMenu.map(i => i.category))];
@@ -28,7 +50,6 @@ const UserSection = () => {
   const activeOrder = orders.find(o => o.id === activeOrderId);
   const isOrderConfirmed = activeOrder && (activeOrder.status === 'confirmed' || activeOrder.status === 'preparing' || activeOrder.status === 'ready');
 
-  // Set default active category
   if (!activeCategory && categories.length > 0) {
     setActiveCategory(categories[0]);
   }
@@ -62,25 +83,48 @@ const UserSection = () => {
     }
   };
 
-  const handlePlaceOrder = async () => {
+  const executePlaceOrder = async () => {
     if (!customerName.trim()) { toast.error('Please enter your name'); return; }
-    if (!tableNumber) { toast.error('Please enter table number'); return; }
+    if (orderType === 'dine-in' && !tableNumber) { toast.error('Please enter table number'); return; }
     const { valid, cleaned, error } = validateIndianPhone(phone);
     if (!valid) { setPhoneError(error || 'Invalid phone'); toast.error(error || 'Invalid phone number'); return; }
     if (cart.length === 0) { toast.error('Add items to your cart first'); return; }
 
     setPlacing(true);
     try {
-      const id = await placeOrder(cart, parseInt(tableNumber), cleaned, customerName.trim());
-      setActiveOrderId(id);
+      const tbl = orderType === 'preorder' ? 0 : parseInt(tableNumber);
+      const result = await placeOrder(cart, tbl, cleaned, customerName.trim(), orderType);
+      setActiveOrderId(result.orderNumber);
       setCart([]);
-      setShowCart(false);
-      toast.success(`Order ${id} placed! 🎉`);
+
+      if (orderType === 'preorder' && result.pickupPin) {
+        setSuccessPin(result.pickupPin);
+        setSuccessOrderId(result.orderNumber);
+      } else {
+        setShowCart(false);
+        toast.success(`Order ${result.orderNumber} placed! 🎉`);
+      }
     } catch (err) {
       toast.error('Failed to place order. Please try again.');
     } finally {
       setPlacing(false);
     }
+  };
+
+  const handlePlaceOrder = async () => {
+    // If not authenticated, show OTP modal first
+    if (!isAuthed) {
+      setShowOTPModal(true);
+      return;
+    }
+    await executePlaceOrder();
+  };
+
+  const handleOTPSuccess = (otpPhone: string, otpName: string) => {
+    setPhone(otpPhone);
+    setCustomerName(otpName);
+    // After successful OTP, proceed to place the order
+    setTimeout(() => executePlaceOrder(), 300);
   };
 
   const handleRequestMore = async () => {
@@ -95,13 +139,17 @@ const UserSection = () => {
 
   const getCartQty = (id: string) => cart.find(c => c.menuItem.id === id)?.quantity || 0;
 
+  const copyPin = () => {
+    if (successPin) {
+      navigator.clipboard.writeText(successPin);
+      toast.success('PIN copied!');
+    }
+  };
+
   if (menuLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-        >
+        <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
           <Loader2 className="h-10 w-10 text-primary" />
         </motion.div>
         <p className="text-muted-foreground text-sm animate-pulse">Loading delicious menu...</p>
@@ -111,49 +159,89 @@ const UserSection = () => {
 
   return (
     <div className="space-y-6">
+      {/* OTP Modal */}
+      <OTPModal open={showOTPModal} onClose={() => setShowOTPModal(false)} onSuccess={handleOTPSuccess} />
+
       {/* Hero */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="text-center py-8 space-y-3"
-      >
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
-          className="text-5xl mb-2"
-        >
-          🍛
-        </motion.div>
+      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="text-center py-8 space-y-3">
+        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2, type: 'spring', stiffness: 200 }} className="text-5xl mb-2">🍛</motion.div>
         <h2 className="text-4xl font-extrabold text-foreground tracking-tight" style={{ fontFamily: 'var(--text-display)' }}>
           <span className="gradient-warm bg-clip-text text-transparent">Browse Menu</span>
         </h2>
         <p className="text-muted-foreground text-sm flex items-center justify-center gap-1.5">
           <Flame className="h-3.5 w-3.5 text-primary" /> Fresh & made with love at The Curry Corner
         </p>
+        {isAuthed && (
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-primary font-medium">
+            ✅ Logged in as {customerName || user?.phone}
+          </motion.p>
+        )}
       </motion.div>
+
+      {/* Pre-order Success Card */}
+      <AnimatePresence>
+        {successPin && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+          >
+            <Card className="p-8 rounded-3xl border-2 border-primary/30 bg-gradient-to-br from-primary/5 via-primary/10 to-accent/5 text-center space-y-4">
+              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.2 }}>
+                <CheckCircle2 className="h-16 w-16 text-primary mx-auto" />
+              </motion.div>
+              <h3 className="text-2xl font-extrabold text-foreground">Pre-Order Placed! 🎉</h3>
+              <p className="text-sm text-muted-foreground">Order <span className="font-bold text-foreground">{successOrderId}</span></p>
+
+              <div className="bg-card rounded-2xl p-6 border border-border shadow-lg">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-2">Your Pickup PIN</p>
+                <motion.p
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', delay: 0.4 }}
+                  className="text-6xl font-black text-primary tracking-[0.3em] font-mono"
+                >
+                  {successPin}
+                </motion.p>
+              </div>
+
+              <Button variant="outline" className="rounded-xl gap-2" onClick={copyPin}>
+                <Copy className="h-4 w-4" /> Copy PIN
+              </Button>
+
+              <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                📍 Show this PIN at the counter when you arrive to collect your order.
+              </p>
+
+              <Button
+                className="w-full gradient-warm text-primary-foreground rounded-2xl h-12 font-bold"
+                onClick={() => { setSuccessPin(null); setSuccessOrderId(null); setShowCart(false); }}
+              >
+                Done
+              </Button>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Active Order Status */}
       <AnimatePresence>
-        {activeOrder && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-          >
+        {activeOrder && !successPin && (
+          <motion.div initial={{ opacity: 0, scale: 0.95, y: -10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}>
             <Card className="p-5 border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl food-card-shadow">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-bold text-foreground text-lg">{activeOrder.id}</p>
-                  <p className="text-sm text-muted-foreground">Table {activeOrder.tableNumber} • {activeOrder.customerName}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-foreground text-lg">{activeOrder.id}</p>
+                    {activeOrder.orderType === 'preorder' && (
+                      <Badge className="bg-primary/15 text-primary text-[10px] font-bold rounded-full px-2">🔥 PRE-ORDER</Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {activeOrder.orderType === 'dine-in' ? `Table ${activeOrder.tableNumber} • ` : ''}{activeOrder.customerName}
+                  </p>
                 </div>
-                <motion.div
-                  key={activeOrder.status}
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ type: 'spring' }}
-                >
+                <motion.div key={activeOrder.status} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring' }}>
                   <Badge className={`rounded-full px-4 py-1.5 text-xs font-semibold ${
                     activeOrder.status === 'pending' ? 'bg-warning/15 text-warning border-warning/30' :
                     activeOrder.status === 'confirmed' ? 'gradient-warm text-primary-foreground' :
@@ -170,12 +258,11 @@ const UserSection = () => {
               <p className="text-sm mt-3 text-muted-foreground font-medium">
                 Total: <span className="text-primary font-bold text-base">₹{activeOrder.totalAmount}</span>
               </p>
+              {activeOrder.pickupPin && (
+                <p className="text-sm mt-1 font-semibold text-primary">📍 Pickup PIN: <span className="font-mono text-lg">{activeOrder.pickupPin}</span></p>
+              )}
               {isOrderConfirmed && (
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-xs mt-2 text-accent font-semibold"
-                >
+                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs mt-2 text-accent font-semibold">
                   ✨ Order confirmed — you can add more items below!
                 </motion.p>
               )}
@@ -185,106 +272,72 @@ const UserSection = () => {
       </AnimatePresence>
 
       {/* Category Chips */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide"
-      >
-        {categories.map(cat => (
-          <button
-            key={cat}
-            onClick={() => setActiveCategory(cat)}
-            className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 ${
-              activeCategory === cat
-                ? 'gradient-warm text-primary-foreground shadow-lg shadow-primary/20 scale-105'
-                : 'bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground'
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
-      </motion.div>
+      {!successPin && (
+        <>
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            {categories.map(cat => (
+              <button key={cat} onClick={() => setActiveCategory(cat)} className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 ${
+                activeCategory === cat
+                  ? 'gradient-warm text-primary-foreground shadow-lg shadow-primary/20 scale-105'
+                  : 'bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground'
+              }`}>
+                {cat}
+              </button>
+            ))}
+          </motion.div>
 
-      {/* Menu Grid */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={activeCategory}
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
-          transition={{ duration: 0.3 }}
-          className="grid grid-cols-2 gap-4"
-        >
-          {availableMenu.filter(i => i.category === activeCategory).map((item, idx) => {
-            const qty = getCartQty(item.id);
-            return (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.05 }}
-              >
-                <Card
-                  className="overflow-hidden rounded-2xl hover:food-card-shadow transition-all duration-300 group cursor-pointer border-border/50 hover:border-primary/30 hover:-translate-y-1 active:scale-[0.98]"
-                  onClick={() => addToCart(item)}
-                >
-                  <div className="relative h-36 overflow-hidden">
-                    {item.image ? (
-                      <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                          target.parentElement!.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-secondary text-5xl">${item.emoji}</div>`;
-                        }} />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-secondary text-5xl">{item.emoji}</div>
-                    )}
-                    <AnimatePresence>
-                      {qty > 0 && (
-                        <motion.div
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          exit={{ scale: 0 }}
-                          className="absolute top-2 right-2 gradient-warm text-primary-foreground text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shadow-lg"
-                        >
-                          {qty}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-                    <div className="absolute bottom-2 left-3">
-                      <p className="text-white font-bold text-sm drop-shadow-lg">{item.name}</p>
-                    </div>
-                  </div>
-                  <div className="p-3 flex items-center justify-between">
-                    <p className="text-primary font-extrabold text-lg">₹{item.price}</p>
-                    <div className={`h-8 w-8 rounded-full flex items-center justify-center transition-all duration-300 ${
-                      qty > 0 ? 'gradient-warm text-primary-foreground shadow-md' : 'bg-primary/10 text-primary group-hover:bg-primary/20'
-                    }`}>
-                      <Plus className="h-4 w-4" />
-                    </div>
-                  </div>
-                </Card>
-              </motion.div>
-            );
-          })}
-        </motion.div>
-      </AnimatePresence>
+          {/* Menu Grid */}
+          <AnimatePresence mode="wait">
+            <motion.div key={activeCategory} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }} className="grid grid-cols-2 gap-4">
+              {availableMenu.filter(i => i.category === activeCategory).map((item, idx) => {
+                const qty = getCartQty(item.id);
+                return (
+                  <motion.div key={item.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}>
+                    <Card className="overflow-hidden rounded-2xl hover:food-card-shadow transition-all duration-300 group cursor-pointer border-border/50 hover:border-primary/30 hover:-translate-y-1 active:scale-[0.98]" onClick={() => addToCart(item)}>
+                      <div className="relative h-36 overflow-hidden">
+                        {item.image ? (
+                          <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            target.parentElement!.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-secondary text-5xl">${item.emoji}</div>`;
+                          }} />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-secondary text-5xl">{item.emoji}</div>
+                        )}
+                        <AnimatePresence>
+                          {qty > 0 && (
+                            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} className="absolute top-2 right-2 gradient-warm text-primary-foreground text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shadow-lg">
+                              {qty}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+                        <div className="absolute bottom-2 left-3">
+                          <p className="text-white font-bold text-sm drop-shadow-lg">{item.name}</p>
+                        </div>
+                      </div>
+                      <div className="p-3 flex items-center justify-between">
+                        <p className="text-primary font-extrabold text-lg">₹{item.price}</p>
+                        <div className={`h-8 w-8 rounded-full flex items-center justify-center transition-all duration-300 ${
+                          qty > 0 ? 'gradient-warm text-primary-foreground shadow-md' : 'bg-primary/10 text-primary group-hover:bg-primary/20'
+                        }`}>
+                          <Plus className="h-4 w-4" />
+                        </div>
+                      </div>
+                    </Card>
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+          </AnimatePresence>
+        </>
+      )}
 
       {/* Floating Cart Button */}
       <AnimatePresence>
-        {cartCount > 0 && (
-          <motion.div
-            initial={{ y: 100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 100, opacity: 0 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-lg"
-          >
-            <Button
-              className="w-full gradient-warm text-primary-foreground rounded-2xl h-14 text-base font-bold shadow-2xl shadow-primary/30 hover:shadow-primary/50 transition-all relative"
-              onClick={() => setShowCart(true)}
-            >
+        {cartCount > 0 && !successPin && (
+          <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 100, opacity: 0 }} className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-lg">
+            <Button className="w-full gradient-warm text-primary-foreground rounded-2xl h-14 text-base font-bold shadow-2xl shadow-primary/30 hover:shadow-primary/50 transition-all relative" onClick={() => setShowCart(true)}>
               <ShoppingCart className="h-5 w-5 mr-3" />
               View Cart • {cartCount} item{cartCount > 1 ? 's' : ''} • ₹{cartTotal}
             </Button>
@@ -294,30 +347,13 @@ const UserSection = () => {
 
       {/* Cart Overlay */}
       <AnimatePresence>
-        {showCart && (
+        {showCart && !successPin && (
           <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50"
-              onClick={() => setShowCart(false)}
-            />
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto shadow-2xl border-t border-border/50"
-            >
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50" onClick={() => setShowCart(false)} />
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 300 }} className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto shadow-2xl border-t border-border/50">
               <div className="flex items-center justify-between mb-5">
-                <h3 className="font-bold text-foreground text-xl flex items-center gap-2">
-                  🛒 Your Cart
-                </h3>
-                <button
-                  onClick={() => setShowCart(false)}
-                  className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors"
-                >
+                <h3 className="font-bold text-foreground text-xl flex items-center gap-2">🛒 Your Cart</h3>
+                <button onClick={() => setShowCart(false)} className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">
                   <X className="h-4 w-4 text-muted-foreground" />
                 </button>
               </div>
@@ -326,16 +362,39 @@ const UserSection = () => {
                 <p className="text-muted-foreground text-sm text-center py-10">Your cart is empty</p>
               ) : (
                 <div className="space-y-4">
+                  {/* Dine-in / Pre-order Toggle */}
+                  {!activeOrderId && (
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between p-4 rounded-2xl bg-secondary/50 border border-border/50">
+                      <div className="flex items-center gap-3">
+                        {orderType === 'dine-in' ? (
+                          <div className="h-9 w-9 rounded-full gradient-warm flex items-center justify-center">
+                            <MapPin className="h-4 w-4 text-primary-foreground" />
+                          </div>
+                        ) : (
+                          <div className="h-9 w-9 rounded-full gradient-cool flex items-center justify-center">
+                            <Clock className="h-4 w-4 text-accent-foreground" />
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-sm font-bold text-foreground">{orderType === 'dine-in' ? 'Dine-in' : 'Pre-order'}</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {orderType === 'dine-in' ? 'Eating at the restaurant' : 'Pick up when you arrive'}
+                          </p>
+                        </div>
+                      </div>
+                      <Switch
+                        checked={orderType === 'preorder'}
+                        onCheckedChange={(checked) => setOrderType(checked ? 'preorder' : 'dine-in')}
+                      />
+                    </motion.div>
+                  )}
+
+                  {/* Cart Items */}
                   {cart.map(item => (
-                    <motion.div
-                      key={item.menuItem.id}
-                      layout
-                      className="flex items-center justify-between py-3 border-b border-border/30 last:border-0"
-                    >
+                    <motion.div key={item.menuItem.id} layout className="flex items-center justify-between py-3 border-b border-border/30 last:border-0">
                       <div className="flex items-center gap-3">
                         {item.menuItem.image && (
-                          <img src={item.menuItem.image} alt={item.menuItem.name} className="w-12 h-12 rounded-xl object-cover"
-                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                          <img src={item.menuItem.image} alt={item.menuItem.name} className="w-12 h-12 rounded-xl object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                         )}
                         <div>
                           <span className="text-sm font-semibold text-foreground">{item.menuItem.name}</span>
@@ -361,19 +420,26 @@ const UserSection = () => {
                   </div>
 
                   {!activeOrderId && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="space-y-3 pt-2"
-                    >
-                      <Input className="rounded-xl h-12" placeholder="Your Name" value={customerName} onChange={e => setCustomerName(e.target.value)} />
-                      <div className="grid grid-cols-2 gap-3">
-                        <Input className="rounded-xl h-12" placeholder="Table No." value={tableNumber} onChange={e => setTableNumber(e.target.value)} type="number" />
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3 pt-2">
+                      <Input
+                        className="rounded-xl h-12"
+                        placeholder="Your Name"
+                        value={customerName}
+                        onChange={e => setCustomerName(e.target.value)}
+                        readOnly={isAuthed}
+                        disabled={isAuthed}
+                      />
+                      <div className={`grid gap-3 ${orderType === 'dine-in' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                        {orderType === 'dine-in' && (
+                          <Input className="rounded-xl h-12" placeholder="Table No." value={tableNumber} onChange={e => setTableNumber(e.target.value)} type="number" />
+                        )}
                         <Input
                           className={`rounded-xl h-12 ${phoneError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                           placeholder="WhatsApp No."
                           value={phone}
                           onChange={e => handlePhoneChange(e.target.value)}
+                          readOnly={isAuthed}
+                          disabled={isAuthed}
                         />
                       </div>
                       {phoneError && (
@@ -391,7 +457,7 @@ const UserSection = () => {
                       disabled={placing || (!!activeOrderId && activeOrder?.status === 'pending')}
                     >
                       {placing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-                      {placing ? 'Placing Order...' : activeOrderId ? 'Waiting for confirmation...' : 'Place Order'}
+                      {placing ? 'Placing Order...' : activeOrderId ? 'Waiting for confirmation...' : orderType === 'preorder' ? '🔥 Place Pre-Order' : 'Place Order'}
                     </Button>
                   ) : (
                     <Button className="w-full gradient-cool text-accent-foreground rounded-2xl h-14 text-base font-bold mt-2" onClick={handleRequestMore}>

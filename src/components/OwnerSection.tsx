@@ -56,12 +56,7 @@ const OwnerSection = () => {
       </motion.div>
 
       {/* Quick Stats */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="grid grid-cols-3 gap-3"
-      >
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="grid grid-cols-3 gap-3">
         <Card className="p-4 rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10 border-primary/15 stat-glow">
           <IndianRupee className="h-4 w-4 text-primary mb-1" />
           <p className="text-2xl font-extrabold text-foreground">₹{totalRevenue.toLocaleString()}</p>
@@ -103,19 +98,20 @@ const OwnerSection = () => {
           ) : (
             <AnimatePresence>
               {liveOrders.map((order, idx) => (
-                <motion.div
-                  key={order.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.05 }}
-                  layout
-                >
+                <motion.div key={order.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }} layout>
                   <Card className="p-5 rounded-2xl hover:food-card-shadow transition-all">
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <p className="font-bold text-foreground text-base">{order.id}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-bold text-foreground text-base">{order.id}</p>
+                          {order.orderType === 'preorder' && (
+                            <Badge className="bg-primary/15 text-primary text-[10px] font-bold rounded-full px-2 py-0.5 border-primary/30">🔥 PRE-ORDER</Badge>
+                          )}
+                        </div>
                         <p className="text-sm text-muted-foreground">
-                          Table {order.tableNumber} • {order.customerName} • {order.userPhone}
+                          {order.orderType === 'dine-in' ? `Table ${order.tableNumber} • ` : ''}
+                          {order.customerName} • {order.userPhone}
+                          {order.pickupPin && <span className="font-semibold text-primary ml-1">• PIN: {order.pickupPin}</span>}
                         </p>
                       </div>
                       <Badge className={`rounded-full px-3 py-1 text-xs font-semibold ${
@@ -177,19 +173,12 @@ const OwnerSection = () => {
         <TabsContent value="menu" className="space-y-2 mt-6">
           <p className="text-sm text-muted-foreground mb-4 font-medium">Toggle item availability for today</p>
           {menu.map((item, idx) => (
-            <motion.div
-              key={item.id}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: idx * 0.03 }}
-              className="flex items-center justify-between py-3 px-4 rounded-xl hover:bg-secondary/50 transition-colors border-b border-border/30 last:border-0"
-            >
+            <motion.div key={item.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.03 }}
+              className="flex items-center justify-between py-3 px-4 rounded-xl hover:bg-secondary/50 transition-colors border-b border-border/30 last:border-0">
               <div className="flex items-center gap-3">
                 <span className={`text-2xl ${!item.available ? 'opacity-40 grayscale' : ''}`}>{item.emoji}</span>
                 <div>
-                  <p className={`font-semibold text-sm ${item.available ? 'text-foreground' : 'text-muted-foreground line-through'}`}>
-                    {item.name}
-                  </p>
+                  <p className={`font-semibold text-sm ${item.available ? 'text-foreground' : 'text-muted-foreground line-through'}`}>{item.name}</p>
                   <p className="text-xs text-muted-foreground">{item.category} • ₹{item.price}</p>
                 </div>
               </div>
@@ -213,38 +202,23 @@ const OwnerSection = () => {
                       counts[i.menuItem.name] = (counts[i.menuItem.name] || 0) + i.quantity;
                     });
                   });
-                  return Object.entries(counts)
-                    .sort(([,a], [,b]) => b - a)
-                    .slice(0, 5)
-                    .map(([name, count], idx) => (
-                      <motion.div
-                        key={name}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: idx * 0.1 }}
-                        className="flex items-center justify-between py-2"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className={`text-xs font-extrabold w-7 h-7 rounded-full flex items-center justify-center ${
-                            idx === 0 ? 'gradient-warm text-primary-foreground' :
-                            idx === 1 ? 'bg-secondary text-foreground' :
-                            'bg-muted text-muted-foreground'
-                          }`}>{idx + 1}</span>
-                          <span className="text-sm font-medium text-foreground">{name}</span>
+                  return Object.entries(counts).sort(([,a], [,b]) => b - a).slice(0, 5).map(([name, count], idx) => (
+                    <motion.div key={name} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.1 }} className="flex items-center justify-between py-2">
+                      <div className="flex items-center gap-3">
+                        <span className={`text-xs font-extrabold w-7 h-7 rounded-full flex items-center justify-center ${
+                          idx === 0 ? 'gradient-warm text-primary-foreground' : idx === 1 ? 'bg-secondary text-foreground' : 'bg-muted text-muted-foreground'
+                        }`}>{idx + 1}</span>
+                        <span className="text-sm font-medium text-foreground">{name}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 rounded-full bg-primary/20 w-20">
+                          <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(100, (count / Math.max(...Object.values(counts))) * 100)}%` }}
+                            transition={{ delay: 0.5 + idx * 0.1, duration: 0.5 }} className="h-full rounded-full gradient-warm" />
                         </div>
-                        <div className="flex items-center gap-2">
-                          <div className="h-2 rounded-full bg-primary/20 w-20">
-                            <motion.div
-                              initial={{ width: 0 }}
-                              animate={{ width: `${Math.min(100, (count / Math.max(...Object.values(counts))) * 100)}%` }}
-                              transition={{ delay: 0.5 + idx * 0.1, duration: 0.5 }}
-                              className="h-full rounded-full gradient-warm"
-                            />
-                          </div>
-                          <span className="text-sm font-bold text-primary w-12 text-right">{count}</span>
-                        </div>
-                      </motion.div>
-                    ));
+                        <span className="text-sm font-bold text-primary w-12 text-right">{count}</span>
+                      </div>
+                    </motion.div>
+                  ));
                 })()}
               </div>
             )}
@@ -259,7 +233,12 @@ const OwnerSection = () => {
                 {orders.map(order => (
                   <div key={order.id} className="flex items-center justify-between py-2 px-3 rounded-xl hover:bg-secondary/50 transition-colors">
                     <div>
-                      <p className="text-sm font-semibold text-foreground">{order.id}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-foreground">{order.id}</p>
+                        {order.orderType === 'preorder' && (
+                          <Badge className="bg-primary/15 text-primary text-[9px] font-bold rounded-full px-1.5 py-0">🔥</Badge>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">{order.customerName} • ₹{order.totalAmount}</p>
                     </div>
                     <div className="flex gap-1">
@@ -278,7 +257,7 @@ const OwnerSection = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Bill Preview Dialog — shows visual receipt */}
+      {/* Bill Preview Dialog */}
       <Dialog open={!!previewOrder} onOpenChange={() => setPreviewOrder(null)}>
         <DialogContent className="max-w-md rounded-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>

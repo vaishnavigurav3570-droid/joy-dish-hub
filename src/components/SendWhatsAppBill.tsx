@@ -21,19 +21,16 @@ const SendWhatsAppBill: React.FC<SendWhatsAppBillProps> = ({ order, onBillSent }
     setLoading(true);
 
     try {
-      // 1. Screenshot the bill
       const canvas = await html2canvas(billRef.current, {
         scale: 2,
         useCORS: true,
         backgroundColor: '#FFF8F0',
       });
 
-      // 2. Convert to blob
       const blob = await new Promise<Blob>((resolve, reject) => {
         canvas.toBlob(b => (b ? resolve(b) : reject(new Error('Failed to create image'))), 'image/png');
       });
 
-      // 3. Upload to storage
       const fileName = `bill-${order.id}-${Date.now()}.png`;
       const { error: uploadError } = await supabase.storage
         .from('bills')
@@ -41,17 +38,15 @@ const SendWhatsAppBill: React.FC<SendWhatsAppBillProps> = ({ order, onBillSent }
 
       if (uploadError) throw uploadError;
 
-      // 4. Get public URL
       const { data: urlData } = supabase.storage.from('bills').getPublicUrl(fileName);
       const publicUrl = urlData.publicUrl;
 
-      // 5. Build WhatsApp message
-      const message = `Hello! Thank you for dining at Curry Corner. Your total is ₹${order.totalAmount}. Here is your official bill: ${publicUrl}`;
+      const promoText = `Skip the wait next time! Pre-order 20 mins before you arrive at: ${window.location.origin}`;
+      const message = `Hello! Thank you for dining at Curry Corner. Your total is ₹${order.totalAmount}. Here is your official bill: ${publicUrl}\n\n${promoText}`;
       const cleanPhone = order.userPhone.replace(/\D/g, '');
       const fullPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
       const waUrl = `https://wa.me/${fullPhone}?text=${encodeURIComponent(message)}`;
 
-      // 6. Open WhatsApp
       window.open(waUrl, '_blank');
       onBillSent?.();
       toast.success('Bill sent via WhatsApp!');
@@ -65,7 +60,6 @@ const SendWhatsAppBill: React.FC<SendWhatsAppBillProps> = ({ order, onBillSent }
 
   return (
     <div className="space-y-4">
-      {/* Hidden off-screen render for html2canvas */}
       <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
         <BillReceipt ref={billRef} order={order} />
       </div>

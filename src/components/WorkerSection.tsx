@@ -13,20 +13,26 @@ const WorkerSection = () => {
   const activeOrders = orders.filter(o => o.status === 'confirmed');
   const readyOrders = orders.filter(o => o.status === 'ready');
 
-  const handleConfirm = (id: string) => {
-    confirmOrder(id);
-    toast.success('Order confirmed! 👨‍🍳');
-  };
+  const handleConfirm = (id: string) => { confirmOrder(id); toast.success('Order confirmed! 👨‍🍳'); };
+  const handleReject = (id: string) => { rejectOrder(id); toast.error('Order rejected'); };
+  const handleReady = (id: string) => { markReady(id); toast.success('Order ready to serve! ✅'); };
 
-  const handleReject = (id: string) => {
-    rejectOrder(id);
-    toast.error('Order rejected');
-  };
-
-  const handleReady = (id: string) => {
-    markReady(id);
-    toast.success('Order ready to serve! ✅');
-  };
+  const OrderMeta = ({ order }: { order: typeof orders[0] }) => (
+    <div>
+      <div className="flex items-center gap-2 flex-wrap">
+        <p className="font-bold text-foreground text-base">{order.id}</p>
+        {order.orderType === 'preorder' && (
+          <Badge className="bg-primary/15 text-primary text-[10px] font-bold rounded-full px-2 py-0.5 border-primary/30">🔥 PRE-ORDER</Badge>
+        )}
+      </div>
+      <p className="text-sm text-muted-foreground">
+        {order.orderType === 'dine-in' ? `Table ${order.tableNumber} • ` : ''}
+        {order.customerName}
+        {order.pickupPin && <span className="font-semibold text-primary ml-1">• PIN: {order.pickupPin}</span>}
+        {' • '}{order.createdAt.toLocaleTimeString()}
+      </p>
+    </div>
+  );
 
   return (
     <div className="space-y-8">
@@ -36,12 +42,7 @@ const WorkerSection = () => {
       </motion.div>
 
       {/* Stats */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="grid grid-cols-3 gap-3"
-      >
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="grid grid-cols-3 gap-3">
         {[
           { count: pendingOrders.length, label: 'Pending', color: 'warning', icon: Clock },
           { count: activeOrders.length, label: 'Cooking', color: 'primary', icon: Flame },
@@ -49,14 +50,7 @@ const WorkerSection = () => {
         ].map(stat => (
           <Card key={stat.label} className={`p-4 text-center rounded-2xl border-${stat.color}/20 bg-gradient-to-br from-${stat.color}/5 to-${stat.color}/10`}>
             <stat.icon className={`h-4 w-4 text-${stat.color} mx-auto mb-1`} />
-            <motion.p
-              key={stat.count}
-              initial={{ scale: 1.3 }}
-              animate={{ scale: 1 }}
-              className={`text-3xl font-extrabold text-${stat.color}`}
-            >
-              {stat.count}
-            </motion.p>
+            <motion.p key={stat.count} initial={{ scale: 1.3 }} animate={{ scale: 1 }} className={`text-3xl font-extrabold text-${stat.color}`}>{stat.count}</motion.p>
             <p className="text-[10px] text-muted-foreground mt-1 font-medium uppercase tracking-wider">{stat.label}</p>
           </Card>
         ))}
@@ -66,25 +60,15 @@ const WorkerSection = () => {
       {pendingOrders.length > 0 && (
         <div>
           <h3 className="font-bold text-foreground mb-3 flex items-center gap-2 text-lg">
-            <span className="w-2.5 h-2.5 rounded-full bg-warning animate-pulse" />
-            New Orders
+            <span className="w-2.5 h-2.5 rounded-full bg-warning animate-pulse" /> New Orders
           </h3>
           <div className="space-y-3">
             <AnimatePresence>
               {pendingOrders.map(order => (
-                <motion.div
-                  key={order.id}
-                  initial={{ opacity: 0, x: -30 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 30, height: 0 }}
-                  layout
-                >
+                <motion.div key={order.id} initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 30, height: 0 }} layout>
                   <Card className="p-5 rounded-2xl border-l-4 border-l-warning bg-gradient-to-r from-warning/5 to-transparent">
                     <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <p className="font-bold text-foreground text-base">{order.id}</p>
-                        <p className="text-sm text-muted-foreground">Table {order.tableNumber} • {order.customerName} • {order.createdAt.toLocaleTimeString()}</p>
-                      </div>
+                      <OrderMeta order={order} />
                       <Badge className="bg-secondary text-foreground font-bold rounded-full px-3">₹{order.totalAmount}</Badge>
                     </div>
                     <div className="space-y-1.5 mb-4">
@@ -116,25 +100,15 @@ const WorkerSection = () => {
       {activeOrders.length > 0 && (
         <div>
           <h3 className="font-bold text-foreground mb-3 flex items-center gap-2 text-lg">
-            <Flame className="h-5 w-5 text-primary" />
-            Cooking Now
+            <Flame className="h-5 w-5 text-primary" /> Cooking Now
           </h3>
           <div className="space-y-3">
             <AnimatePresence>
               {activeOrders.map(order => (
-                <motion.div
-                  key={order.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, height: 0 }}
-                  layout
-                >
+                <motion.div key={order.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }} layout>
                   <Card className="p-5 rounded-2xl border-l-4 border-l-primary bg-gradient-to-r from-primary/5 to-transparent">
                     <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <p className="font-bold text-foreground">{order.id}</p>
-                        <p className="text-sm text-muted-foreground">Table {order.tableNumber} • {order.customerName}</p>
-                      </div>
+                      <OrderMeta order={order} />
                       <Badge className="gradient-warm text-primary-foreground rounded-full px-3">₹{order.totalAmount}</Badge>
                     </div>
                     <div className="space-y-1.5 mb-2">
@@ -178,10 +152,7 @@ const WorkerSection = () => {
               <motion.div key={order.id} layout>
                 <Card className="p-4 rounded-2xl border-l-4 border-l-accent bg-gradient-to-r from-accent/5 to-transparent">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-bold text-foreground">{order.id}</p>
-                      <p className="text-sm text-muted-foreground">Table {order.tableNumber} • {order.customerName}</p>
-                    </div>
+                    <OrderMeta order={order} />
                     <Badge className="gradient-cool text-accent-foreground rounded-full px-3 font-bold">₹{order.totalAmount}</Badge>
                   </div>
                 </Card>
@@ -192,11 +163,7 @@ const WorkerSection = () => {
       )}
 
       {orders.length === 0 && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-center py-20 text-muted-foreground"
-        >
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-20 text-muted-foreground">
           <ChefHat className="h-16 w-16 mx-auto mb-4 opacity-20" />
           <p className="text-lg font-medium">No orders yet</p>
           <p className="text-sm">Waiting for customers to place orders...</p>
