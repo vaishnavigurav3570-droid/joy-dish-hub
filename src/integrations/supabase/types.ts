@@ -108,6 +108,8 @@ export type Database = {
           id: string
           notes: string | null
           order_number: string
+          order_type: string
+          pickup_pin: string | null
           status: string
           table_number: number
           total_amount: number
@@ -122,6 +124,8 @@ export type Database = {
           id?: string
           notes?: string | null
           order_number: string
+          order_type?: string
+          pickup_pin?: string | null
           status?: string
           table_number: number
           total_amount?: number
@@ -136,6 +140,8 @@ export type Database = {
           id?: string
           notes?: string | null
           order_number?: string
+          order_type?: string
+          pickup_pin?: string | null
           status?: string
           table_number?: number
           total_amount?: number
