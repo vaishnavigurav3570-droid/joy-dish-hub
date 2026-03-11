@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { MenuItem, Order, CartItem } from '@/types/order';
+import { MenuItem, Order, CartItem, OrderType } from '@/types/order';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 
@@ -18,7 +18,7 @@ interface OrderContextType {
   orders: Order[];
   menuLoading: boolean;
   toggleMenuAvailability: (id: string) => void;
-  placeOrder: (items: CartItem[], tableNumber: number, phone: string, customerName: string) => Promise<string>;
+  placeOrder: (items: CartItem[], tableNumber: number, phone: string, customerName: string, orderType: OrderType) => Promise<{ orderNumber: string; pickupPin: string | null }>;
   confirmOrder: (orderId: string) => void;
   rejectOrder: (orderId: string) => void;
   markReady: (orderId: string) => void;
@@ -82,7 +82,13 @@ const mapOrder = (row: any): Order => {
     totalAmount: Number(row.total_amount),
     billSent: row.bill_sent,
     additionalRequests,
+    orderType: row.order_type || 'dine-in',
+    pickupPin: row.pickup_pin || null,
   };
+};
+
+const generatePickupPin = (): string => {
+  return String(Math.floor(1000 + Math.random() * 9000));
 };
 
 export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -94,7 +100,6 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const isAdmin = user && (role === 'worker' || role === 'owner');
 
-  // Fetch menu from DB
   useEffect(() => {
     const fetchMenu = async () => {
       const { data } = await supabase.from('menu_items').select('*').order('category');
@@ -106,7 +111,6 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     fetchMenu();
   }, []);
 
-  // Fetch orders from DB for admin users
   const fetchOrders = useCallback(async () => {
     if (!isAdmin) return;
     const { data } = await supabase
@@ -122,24 +126,15 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [isAdmin]);
 
-  useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
+  useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
-  // Realtime subscription for admin
   useEffect(() => {
     if (!isAdmin) return;
-
     const channel = supabase
       .channel('orders-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-        fetchOrders();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, () => {
-        fetchOrders();
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchOrders())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, () => fetchOrders())
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, [isAdmin, fetchOrders]);
 
@@ -151,12 +146,12 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [menu]);
 
   const placeOrder = useCallback(async (
-    items: CartItem[], tableNumber: number, phone: string, customerName: string
-  ): Promise<string> => {
+    items: CartItem[], tableNumber: number, phone: string, customerName: string, orderType: OrderType
+  ): Promise<{ orderNumber: string; pickupPin: string | null }> => {
     const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}`;
     const totalAmount = items.reduce((sum, i) => sum + i.menuItem.price * i.quantity, 0);
+    const pickupPin = orderType === 'preorder' ? generatePickupPin() : null;
 
-    // Insert order into DB
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
       .insert({
@@ -166,6 +161,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         total_amount: totalAmount,
         status: 'pending',
         customer_name: customerName,
+        order_type: orderType,
+        pickup_pin: pickupPin,
       } as any)
       .select('id')
       .single();
@@ -175,7 +172,6 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       throw new Error('Failed to create order');
     }
 
-    // Insert order items
     const orderItems = items.map(i => ({
       order_id: orderData.id,
       menu_item_id: i.menuItem.id,
@@ -186,7 +182,6 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }));
     await supabase.from('order_items').insert(orderItems);
 
-    // Keep local state for customer view
     const order: Order = {
       id: orderNumber,
       tableNumber,
@@ -198,11 +193,13 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       totalAmount,
       billSent: false,
       additionalRequests: [],
+      orderType,
+      pickupPin,
     };
     setOrders(prev => [order, ...prev]);
     setDbOrderMap(prev => ({ ...prev, [orderNumber]: orderData.id }));
 
-    return orderNumber;
+    return { orderNumber, pickupPin };
   }, []);
 
   const updateOrderStatus = useCallback(async (orderNumber: string, status: string) => {
@@ -219,14 +216,9 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const addMoreItems = useCallback(async (orderId: string, items: CartItem[]) => {
     const additionalTotal = items.reduce((sum, i) => sum + i.menuItem.price * i.quantity, 0);
-
     setOrders(prev => prev.map(o => {
       if (o.id !== orderId) return o;
-      return {
-        ...o,
-        additionalRequests: [...o.additionalRequests, ...items],
-        totalAmount: o.totalAmount + additionalTotal,
-      };
+      return { ...o, additionalRequests: [...o.additionalRequests, ...items], totalAmount: o.totalAmount + additionalTotal };
     }));
 
     const dbId = dbOrderMap[orderId];
@@ -240,7 +232,6 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         is_additional: true,
       }));
       await supabase.from('order_items').insert(orderItems);
-
       const order = orders.find(o => o.id === orderId);
       if (order) {
         await supabase.from('orders').update({ total_amount: order.totalAmount + additionalTotal }).eq('id', dbId);

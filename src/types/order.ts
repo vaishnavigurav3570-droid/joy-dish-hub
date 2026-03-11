@@ -13,6 +13,8 @@ export interface CartItem {
   quantity: number;
 }
 
+export type OrderType = 'dine-in' | 'preorder';
+
 export interface Order {
   id: string;
   tableNumber: number;
@@ -24,6 +26,8 @@ export interface Order {
   totalAmount: number;
   billSent: boolean;
   additionalRequests: CartItem[];
+  orderType: OrderType;
+  pickupPin: string | null;
 }
 
 export interface SalesData {
