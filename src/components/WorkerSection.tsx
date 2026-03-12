@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Check, X, ChefHat, Clock, Flame } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
+import BlacklistBanner from './BlacklistBanner';
 
 const WorkerSection = () => {
   const { orders, confirmOrder, rejectOrder, markReady } = useOrders();
@@ -67,6 +68,7 @@ const WorkerSection = () => {
               {pendingOrders.map(order => (
                 <motion.div key={order.id} initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 30, height: 0 }} layout>
                   <Card className="p-5 rounded-2xl border-l-4 border-l-warning bg-gradient-to-r from-warning/5 to-transparent">
+                    <BlacklistBanner order={order} allOrders={orders} />
                     <div className="flex items-start justify-between mb-3">
                       <OrderMeta order={order} />
                       <Badge className="bg-secondary text-foreground font-bold rounded-full px-3">₹{order.totalAmount}</Badge>
@@ -107,6 +109,7 @@ const WorkerSection = () => {
               {activeOrders.map(order => (
                 <motion.div key={order.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }} layout>
                   <Card className="p-5 rounded-2xl border-l-4 border-l-primary bg-gradient-to-r from-primary/5 to-transparent">
+                    <BlacklistBanner order={order} allOrders={orders} />
                     <div className="flex items-start justify-between mb-3">
                       <OrderMeta order={order} />
                       <Badge className="gradient-warm text-primary-foreground rounded-full px-3">₹{order.totalAmount}</Badge>

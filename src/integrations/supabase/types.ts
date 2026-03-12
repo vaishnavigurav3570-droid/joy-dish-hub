@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       menu_items: {
         Row: {
+          ar_model_url: string | null
           available: boolean
           category: string
           created_at: string
@@ -27,6 +28,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ar_model_url?: string | null
           available?: boolean
           category: string
           created_at?: string
@@ -38,6 +40,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ar_model_url?: string | null
           available?: boolean
           category?: string
           created_at?: string
