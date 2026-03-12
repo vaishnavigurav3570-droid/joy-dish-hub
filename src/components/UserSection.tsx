@@ -7,11 +7,12 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { Plus, Minus, ShoppingCart, Send, PackagePlus, Flame, AlertCircle, Loader2, X, MapPin, Clock, CheckCircle2, Copy } from 'lucide-react';
+import { Plus, Minus, ShoppingCart, Send, PackagePlus, Flame, AlertCircle, Loader2, X, MapPin, Clock, CheckCircle2, Copy, Box } from 'lucide-react';
 import { toast } from 'sonner';
 import { validateIndianPhone } from '@/lib/phone';
 import { motion, AnimatePresence } from 'framer-motion';
-import OTPModal from './OTPModal';
+import { lovable } from '@/integrations/lovable/index';
+import ARViewerModal from './ARViewerModal';
 
 const UserSection = () => {
   const { menu, orders, placeOrder, addMoreItems, menuLoading } = useOrders();
@@ -26,19 +27,20 @@ const UserSection = () => {
   const [placing, setPlacing] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [orderType, setOrderType] = useState<OrderType>('dine-in');
-  const [showOTPModal, setShowOTPModal] = useState(false);
   const [successPin, setSuccessPin] = useState<string | null>(null);
   const [successOrderId, setSuccessOrderId] = useState<string | null>(null);
+  const [signingIn, setSigningIn] = useState(false);
+  const [arModel, setArModel] = useState<{ url: string; name: string } | null>(null);
 
-  // Auto-fill from authenticated user session
+  // Auto-fill from authenticated user session (Google metadata)
   useEffect(() => {
     if (user) {
       const meta = user.user_metadata;
-      if (meta?.full_name) setCustomerName(meta.full_name);
-      if (user.phone) {
-        const digits = user.phone.replace(/^\+91/, '').replace(/\D/g, '');
-        setPhone(digits);
-      }
+      const name = meta?.full_name || meta?.name || '';
+      if (name) setCustomerName(name);
+      // Load saved WhatsApp number from localStorage
+      const savedPhone = localStorage.getItem(`wa_phone_${user.id}`);
+      if (savedPhone) setPhone(savedPhone);
     }
   }, [user]);
 
@@ -83,12 +85,33 @@ const UserSection = () => {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    setSigningIn(true);
+    try {
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin,
+      });
+      if (result.error) {
+        toast.error('Google sign-in failed');
+      }
+    } catch {
+      toast.error('Google sign-in failed');
+    } finally {
+      setSigningIn(false);
+    }
+  };
+
   const executePlaceOrder = async () => {
     if (!customerName.trim()) { toast.error('Please enter your name'); return; }
     if (orderType === 'dine-in' && !tableNumber) { toast.error('Please enter table number'); return; }
     const { valid, cleaned, error } = validateIndianPhone(phone);
     if (!valid) { setPhoneError(error || 'Invalid phone'); toast.error(error || 'Invalid phone number'); return; }
     if (cart.length === 0) { toast.error('Add items to your cart first'); return; }
+
+    // Save WhatsApp number to localStorage for auto-fill
+    if (user) {
+      localStorage.setItem(`wa_phone_${user.id}`, phone);
+    }
 
     setPlacing(true);
     try {
@@ -112,19 +135,11 @@ const UserSection = () => {
   };
 
   const handlePlaceOrder = async () => {
-    // If not authenticated, show OTP modal first
     if (!isAuthed) {
-      setShowOTPModal(true);
+      handleGoogleLogin();
       return;
     }
     await executePlaceOrder();
-  };
-
-  const handleOTPSuccess = (otpPhone: string, otpName: string) => {
-    setPhone(otpPhone);
-    setCustomerName(otpName);
-    // After successful OTP, proceed to place the order
-    setTimeout(() => executePlaceOrder(), 300);
   };
 
   const handleRequestMore = async () => {
@@ -159,8 +174,15 @@ const UserSection = () => {
 
   return (
     <div className="space-y-6">
-      {/* OTP Modal */}
-      <OTPModal open={showOTPModal} onClose={() => setShowOTPModal(false)} onSuccess={handleOTPSuccess} />
+      {/* AR Viewer Modal */}
+      {arModel && (
+        <ARViewerModal
+          open={!!arModel}
+          onClose={() => setArModel(null)}
+          modelUrl={arModel.url}
+          itemName={arModel.name}
+        />
+      )}
 
       {/* Hero */}
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="text-center py-8 space-y-3">
@@ -171,52 +193,43 @@ const UserSection = () => {
         <p className="text-muted-foreground text-sm flex items-center justify-center gap-1.5">
           <Flame className="h-3.5 w-3.5 text-primary" /> Fresh & made with love at The Curry Corner
         </p>
-        {isAuthed && (
+        {isAuthed ? (
           <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-primary font-medium">
-            ✅ Logged in as {customerName || user?.phone}
+            ✅ Logged in as {customerName || user?.email}
           </motion.p>
+        ) : (
+          <Button variant="outline" className="rounded-xl gap-2 mt-2" onClick={handleGoogleLogin} disabled={signingIn}>
+            {signingIn ? <Loader2 className="h-4 w-4 animate-spin" /> : (
+              <svg className="h-4 w-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+            )}
+            Continue with Google
+          </Button>
         )}
       </motion.div>
 
       {/* Pre-order Success Card */}
       <AnimatePresence>
         {successPin && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-          >
+          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}>
             <Card className="p-8 rounded-3xl border-2 border-primary/30 bg-gradient-to-br from-primary/5 via-primary/10 to-accent/5 text-center space-y-4">
               <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.2 }}>
                 <CheckCircle2 className="h-16 w-16 text-primary mx-auto" />
               </motion.div>
               <h3 className="text-2xl font-extrabold text-foreground">Pre-Order Placed! 🎉</h3>
               <p className="text-sm text-muted-foreground">Order <span className="font-bold text-foreground">{successOrderId}</span></p>
-
               <div className="bg-card rounded-2xl p-6 border border-border shadow-lg">
                 <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-2">Your Pickup PIN</p>
-                <motion.p
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: 'spring', delay: 0.4 }}
-                  className="text-6xl font-black text-primary tracking-[0.3em] font-mono"
-                >
+                <motion.p initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', delay: 0.4 }} className="text-6xl font-black text-primary tracking-[0.3em] font-mono">
                   {successPin}
                 </motion.p>
               </div>
-
               <Button variant="outline" className="rounded-xl gap-2" onClick={copyPin}>
                 <Copy className="h-4 w-4" /> Copy PIN
               </Button>
-
               <p className="text-sm text-muted-foreground max-w-xs mx-auto">
                 📍 Show this PIN at the counter when you arrive to collect your order.
               </p>
-
-              <Button
-                className="w-full gradient-warm text-primary-foreground rounded-2xl h-12 font-bold"
-                onClick={() => { setSuccessPin(null); setSuccessOrderId(null); setShowCart(false); }}
-              >
+              <Button className="w-full gradient-warm text-primary-foreground rounded-2xl h-12 font-bold" onClick={() => { setSuccessPin(null); setSuccessOrderId(null); setShowCart(false); }}>
                 Done
               </Button>
             </Card>
@@ -291,6 +304,7 @@ const UserSection = () => {
             <motion.div key={activeCategory} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }} className="grid grid-cols-2 gap-4">
               {availableMenu.filter(i => i.category === activeCategory).map((item, idx) => {
                 const qty = getCartQty(item.id);
+                const hasAR = !!(item as any).ar_model_url;
                 return (
                   <motion.div key={item.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}>
                     <Card className="overflow-hidden rounded-2xl hover:food-card-shadow transition-all duration-300 group cursor-pointer border-border/50 hover:border-primary/30 hover:-translate-y-1 active:scale-[0.98]" onClick={() => addToCart(item)}>
@@ -315,6 +329,14 @@ const UserSection = () => {
                         <div className="absolute bottom-2 left-3">
                           <p className="text-white font-bold text-sm drop-shadow-lg">{item.name}</p>
                         </div>
+                        {hasAR && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setArModel({ url: (item as any).ar_model_url, name: item.name }); }}
+                            className="absolute top-2 left-2 bg-accent text-accent-foreground text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-lg hover:scale-105 transition-transform"
+                          >
+                            <Box className="h-3 w-3" /> View in AR 🧊
+                          </button>
+                        )}
                       </div>
                       <div className="p-3 flex items-center justify-between">
                         <p className="text-primary font-extrabold text-lg">₹{item.price}</p>
@@ -382,10 +404,7 @@ const UserSection = () => {
                           </p>
                         </div>
                       </div>
-                      <Switch
-                        checked={orderType === 'preorder'}
-                        onCheckedChange={(checked) => setOrderType(checked ? 'preorder' : 'dine-in')}
-                      />
+                      <Switch checked={orderType === 'preorder'} onCheckedChange={(checked) => setOrderType(checked ? 'preorder' : 'dine-in')} />
                     </motion.div>
                   )}
 
@@ -438,8 +457,6 @@ const UserSection = () => {
                           placeholder="WhatsApp No."
                           value={phone}
                           onChange={e => handlePhoneChange(e.target.value)}
-                          readOnly={isAuthed}
-                          disabled={isAuthed}
                         />
                       </div>
                       {phoneError && (
@@ -456,8 +473,10 @@ const UserSection = () => {
                       onClick={handlePlaceOrder}
                       disabled={placing || (!!activeOrderId && activeOrder?.status === 'pending')}
                     >
-                      {placing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-                      {placing ? 'Placing Order...' : activeOrderId ? 'Waiting for confirmation...' : orderType === 'preorder' ? '🔥 Place Pre-Order' : 'Place Order'}
+                      {placing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : !isAuthed ? (
+                        <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                      ) : <Send className="h-4 w-4 mr-2" />}
+                      {placing ? 'Placing Order...' : !isAuthed ? 'Continue with Google to Order' : activeOrderId ? 'Waiting for confirmation...' : orderType === 'preorder' ? '🔥 Place Pre-Order' : 'Place Order'}
                     </Button>
                   ) : (
                     <Button className="w-full gradient-cool text-accent-foreground rounded-2xl h-14 text-base font-bold mt-2" onClick={handleRequestMore}>

@@ -1,25 +1,30 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useOrders } from '@/context/OrderContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { TrendingUp, UtensilsCrossed, BarChart3, Zap, FileText, Download, Eye, IndianRupee, ShoppingBag } from 'lucide-react';
+import { TrendingUp, UtensilsCrossed, BarChart3, Zap, FileText, Download, Eye, IndianRupee, ShoppingBag, UserX, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateBillText } from '@/lib/phone';
 import { Order } from '@/types/order';
 import SendWhatsAppBill from './SendWhatsAppBill';
 import BillReceipt from './BillReceipt';
+import BlacklistBanner from './BlacklistBanner';
 import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from '@/integrations/supabase/client';
 
 const OwnerSection = () => {
-  const { orders, menu, toggleMenuAvailability, markBillSent, salesData, topItems } = useOrders();
+  const { orders, menu, toggleMenuAvailability, markBillSent, markNoShow, updateMenuItemAR, salesData, topItems } = useOrders();
   const [ownerTab, setOwnerTab] = useState('orders');
   const [previewOrder, setPreviewOrder] = useState<Order | null>(null);
+  const [uploadingAR, setUploadingAR] = useState<string | null>(null);
+  const arFileRef = useRef<HTMLInputElement>(null);
 
-  const liveOrders = orders.filter(o => o.status !== 'rejected');
+  const liveOrders = orders.filter(o => o.status !== 'rejected' && o.status !== 'no_show');
   const totalRevenue = orders.reduce((sum, o) => sum + o.totalAmount, 0);
   const totalOrders = orders.length;
   const pendingCount = orders.filter(o => o.status === 'pending').length;
@@ -44,6 +49,25 @@ const OwnerSection = () => {
     a.click();
     URL.revokeObjectURL(url);
     toast.success('Bill downloaded!');
+  };
+
+  const handleARUpload = async (menuItemId: string, file: File) => {
+    setUploadingAR(menuItemId);
+    try {
+      const fileName = `${menuItemId}-${Date.now()}.glb`;
+      const { error: uploadError } = await supabase.storage
+        .from('ar_models')
+        .upload(fileName, file, { contentType: 'model/gltf-binary', upsert: true });
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage.from('ar_models').getPublicUrl(fileName);
+      await updateMenuItemAR(menuItemId, urlData.publicUrl);
+      toast.success('3D model uploaded!');
+    } catch (err: any) {
+      toast.error(err.message || 'Upload failed');
+    } finally {
+      setUploadingAR(null);
+    }
   };
 
   return (
@@ -100,6 +124,7 @@ const OwnerSection = () => {
               {liveOrders.map((order, idx) => (
                 <motion.div key={order.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }} layout>
                   <Card className="p-5 rounded-2xl hover:food-card-shadow transition-all">
+                    <BlacklistBanner order={order} allOrders={orders} />
                     <div className="flex items-start justify-between mb-3">
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
@@ -156,6 +181,19 @@ const OwnerSection = () => {
                           </Button>
                         </div>
                       </div>
+
+                      {/* Mark as No-Show button for active orders */}
+                      {(order.status === 'pending' || order.status === 'confirmed' || order.status === 'ready') && (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="w-full rounded-xl text-xs font-semibold"
+                          onClick={() => { markNoShow(order.id); toast.error('Customer marked as No-Show'); }}
+                        >
+                          <UserX className="h-3 w-3 mr-1" /> Mark as No-Show
+                        </Button>
+                      )}
+
                       {!order.billSent ? (
                         <SendWhatsAppBill order={order} onBillSent={() => markBillSent(order.id)} />
                       ) : (
@@ -171,7 +209,13 @@ const OwnerSection = () => {
 
         {/* Menu Management */}
         <TabsContent value="menu" className="space-y-2 mt-6">
-          <p className="text-sm text-muted-foreground mb-4 font-medium">Toggle item availability for today</p>
+          <p className="text-sm text-muted-foreground mb-4 font-medium">Toggle item availability & upload 3D models</p>
+          <input ref={arFileRef} type="file" accept=".glb" className="hidden" onChange={(e) => {
+            const file = e.target.files?.[0];
+            const itemId = arFileRef.current?.dataset.itemId;
+            if (file && itemId) handleARUpload(itemId, file);
+            e.target.value = '';
+          }} />
           {menu.map((item, idx) => (
             <motion.div key={item.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.03 }}
               className="flex items-center justify-between py-3 px-4 rounded-xl hover:bg-secondary/50 transition-colors border-b border-border/30 last:border-0">
@@ -180,9 +224,28 @@ const OwnerSection = () => {
                 <div>
                   <p className={`font-semibold text-sm ${item.available ? 'text-foreground' : 'text-muted-foreground line-through'}`}>{item.name}</p>
                   <p className="text-xs text-muted-foreground">{item.category} • ₹{item.price}</p>
+                  {(item as any).ar_model_url && (
+                    <p className="text-[10px] text-accent font-semibold">🧊 3D model uploaded</p>
+                  )}
                 </div>
               </div>
-              <Switch checked={item.available} onCheckedChange={() => toggleMenuAvailability(item.id)} />
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 w-8 p-0 rounded-lg"
+                  disabled={uploadingAR === item.id}
+                  onClick={() => {
+                    if (arFileRef.current) {
+                      arFileRef.current.dataset.itemId = item.id;
+                      arFileRef.current.click();
+                    }
+                  }}
+                >
+                  <Upload className={`h-3.5 w-3.5 ${uploadingAR === item.id ? 'animate-spin' : ''}`} />
+                </Button>
+                <Switch checked={item.available} onCheckedChange={() => toggleMenuAvailability(item.id)} />
+              </div>
             </motion.div>
           ))}
         </TabsContent>
@@ -237,6 +300,9 @@ const OwnerSection = () => {
                         <p className="text-sm font-semibold text-foreground">{order.id}</p>
                         {order.orderType === 'preorder' && (
                           <Badge className="bg-primary/15 text-primary text-[9px] font-bold rounded-full px-1.5 py-0">🔥</Badge>
+                        )}
+                        {order.status === 'no_show' && (
+                          <Badge className="bg-destructive/15 text-destructive text-[9px] font-bold rounded-full px-1.5 py-0">NO-SHOW</Badge>
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">{order.customerName} • ₹{order.totalAmount}</p>

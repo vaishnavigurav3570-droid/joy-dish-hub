@@ -22,8 +22,10 @@ interface OrderContextType {
   confirmOrder: (orderId: string) => void;
   rejectOrder: (orderId: string) => void;
   markReady: (orderId: string) => void;
+  markNoShow: (orderId: string) => void;
   addMoreItems: (orderId: string, items: CartItem[]) => void;
   markBillSent: (orderId: string) => void;
+  updateMenuItemAR: (menuItemId: string, arModelUrl: string) => Promise<void>;
   salesData: typeof MOCK_SALES;
   topItems: { name: string; count: number }[];
 }
@@ -44,6 +46,7 @@ const mapMenuItem = (row: any): MenuItem => ({
   available: row.available,
   emoji: row.emoji || '🍽️',
   image: row.image_url || '',
+  ar_model_url: row.ar_model_url || null,
 });
 
 const mapOrder = (row: any): Order => {
@@ -163,6 +166,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         customer_name: customerName,
         order_type: orderType,
         pickup_pin: pickupPin,
+        customer_user_id: user?.id || null,
       } as any)
       .select('id')
       .single();
@@ -200,7 +204,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setDbOrderMap(prev => ({ ...prev, [orderNumber]: orderData.id }));
 
     return { orderNumber, pickupPin };
-  }, []);
+  }, [user]);
 
   const updateOrderStatus = useCallback(async (orderNumber: string, status: string) => {
     setOrders(prev => prev.map(o => o.id === orderNumber ? { ...o, status: status as any } : o));
@@ -213,6 +217,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const confirmOrder = useCallback((id: string) => { updateOrderStatus(id, 'confirmed'); }, [updateOrderStatus]);
   const rejectOrder = useCallback((id: string) => { updateOrderStatus(id, 'rejected'); }, [updateOrderStatus]);
   const markReady = useCallback((id: string) => { updateOrderStatus(id, 'ready'); }, [updateOrderStatus]);
+  const markNoShow = useCallback((id: string) => { updateOrderStatus(id, 'no_show'); }, [updateOrderStatus]);
 
   const addMoreItems = useCallback(async (orderId: string, items: CartItem[]) => {
     const additionalTotal = items.reduce((sum, i) => sum + i.menuItem.price * i.quantity, 0);
@@ -247,6 +252,11 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [dbOrderMap]);
 
+  const updateMenuItemAR = useCallback(async (menuItemId: string, arModelUrl: string) => {
+    setMenu(prev => prev.map(m => m.id === menuItemId ? { ...m, ar_model_url: arModelUrl } : m));
+    await (supabase.from('menu_items') as any).update({ ar_model_url: arModelUrl }).eq('id', menuItemId);
+  }, []);
+
   const topItems = orders.length > 0 ? (() => {
     const counts: Record<string, number> = {};
     orders.forEach(o => {
@@ -260,7 +270,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   return (
     <OrderContext.Provider value={{
       menu, orders, menuLoading, toggleMenuAvailability, placeOrder, confirmOrder,
-      rejectOrder, markReady, addMoreItems, markBillSent,
+      rejectOrder, markReady, markNoShow, addMoreItems, markBillSent, updateMenuItemAR,
       salesData: MOCK_SALES, topItems,
     }}>
       {children}

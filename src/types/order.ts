@@ -6,6 +6,7 @@ export interface MenuItem {
   available: boolean;
   emoji: string;
   image: string;
+  ar_model_url?: string | null;
 }
 
 export interface CartItem {
@@ -19,7 +20,7 @@ export interface Order {
   id: string;
   tableNumber: number;
   items: CartItem[];
-  status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'rejected';
+  status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'rejected' | 'no_show';
   createdAt: Date;
   userPhone: string;
   customerName: string;
