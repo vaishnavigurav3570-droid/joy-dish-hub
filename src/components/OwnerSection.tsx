@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useOrders } from '@/context/OrderContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,15 +7,18 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { TrendingUp, UtensilsCrossed, BarChart3, Zap, FileText, Download, Eye, IndianRupee, ShoppingBag, UserX, Upload } from 'lucide-react';
+import { TrendingUp, UtensilsCrossed, BarChart3, Zap, FileText, Download, Eye, IndianRupee, ShoppingBag, UserX, Upload, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateBillText } from '@/lib/phone';
 import { Order } from '@/types/order';
 import SendWhatsAppBill from './SendWhatsAppBill';
 import BillReceipt from './BillReceipt';
 import BlacklistBanner from './BlacklistBanner';
+import MonthlyReportPDF from './MonthlyReportPDF';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 const OwnerSection = () => {
   const { orders, menu, toggleMenuAvailability, markBillSent, markNoShow, updateMenuItemAR, salesData, topItems } = useOrders();
