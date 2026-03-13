@@ -13,6 +13,7 @@ import { validateIndianPhone } from '@/lib/phone';
 import { motion, AnimatePresence } from 'framer-motion';
 import { lovable } from '@/integrations/lovable/index';
 import ARViewerModal from './ARViewerModal';
+import GoogleReviewButton from './GoogleReviewButton';
 
 const UserSection = () => {
   const { menu, orders, placeOrder, addMoreItems, menuLoading } = useOrders();
