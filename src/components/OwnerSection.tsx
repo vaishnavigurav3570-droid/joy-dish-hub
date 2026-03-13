@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useOrders } from '@/context/OrderContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,22 +7,47 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { TrendingUp, UtensilsCrossed, BarChart3, Zap, FileText, Download, Eye, IndianRupee, ShoppingBag, UserX, Upload } from 'lucide-react';
+import { TrendingUp, UtensilsCrossed, BarChart3, Zap, FileText, Download, Eye, IndianRupee, ShoppingBag, UserX, Upload, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateBillText } from '@/lib/phone';
 import { Order } from '@/types/order';
 import SendWhatsAppBill from './SendWhatsAppBill';
 import BillReceipt from './BillReceipt';
 import BlacklistBanner from './BlacklistBanner';
+import MonthlyReportPDF from './MonthlyReportPDF';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 const OwnerSection = () => {
   const { orders, menu, toggleMenuAvailability, markBillSent, markNoShow, updateMenuItemAR, salesData, topItems } = useOrders();
   const [ownerTab, setOwnerTab] = useState('orders');
   const [previewOrder, setPreviewOrder] = useState<Order | null>(null);
   const [uploadingAR, setUploadingAR] = useState<string | null>(null);
+  const [exportingPDF, setExportingPDF] = useState(false);
   const arFileRef = useRef<HTMLInputElement>(null);
+  const reportRef = useRef<HTMLDivElement>(null);
+
+  const handleExportPDF = useCallback(async () => {
+    if (!reportRef.current) return;
+    setExportingPDF(true);
+    try {
+      const canvas = await html2canvas(reportRef.current, { scale: 2, useCORS: true });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const imgHeight = (canvas.height * pageWidth) / canvas.width;
+      pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, imgHeight);
+      const month = new Date().toLocaleString('default', { month: 'long', year: 'numeric' }).replace(' ', '_');
+      pdf.save(`CurryCorner_Report_${month}.pdf`);
+      toast.success('PDF report downloaded!');
+    } catch {
+      toast.error('Failed to generate PDF');
+    } finally {
+      setExportingPDF(false);
+    }
+  }, []);
 
   const liveOrders = orders.filter(o => o.status !== 'rejected' && o.status !== 'no_show');
   const totalRevenue = orders.reduce((sum, o) => sum + o.totalAmount, 0);
@@ -252,6 +277,10 @@ const OwnerSection = () => {
 
         {/* Analytics */}
         <TabsContent value="analytics" className="space-y-6 mt-6">
+          <Button onClick={handleExportPDF} disabled={exportingPDF} className="w-full rounded-2xl gradient-warm text-primary-foreground font-bold py-6 text-base shadow-lg">
+            {exportingPDF ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : <FileText className="h-5 w-5 mr-2" />}
+            {exportingPDF ? 'Generating Report…' : '📄 Download PDF Report'}
+          </Button>
           <Card className="p-5 rounded-2xl">
             <h4 className="font-bold text-foreground mb-4 text-base">🏆 Most Ordered Items</h4>
             {orders.length === 0 ? (
@@ -350,6 +379,8 @@ const OwnerSection = () => {
           )}
         </DialogContent>
       </Dialog>
+      {/* Hidden PDF Report */}
+      <MonthlyReportPDF ref={reportRef} orders={orders} />
     </div>
   );
 };
