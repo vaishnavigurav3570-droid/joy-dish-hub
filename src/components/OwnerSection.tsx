@@ -379,8 +379,11 @@ const OwnerSection = () => {
           )}
         </DialogContent>
       </Dialog>
+      {/* Hidden PDF Report */}
+      <MonthlyReportPDF ref={reportRef} orders={orders} />
     </div>
   );
+};
 };
 
 export default OwnerSection;
