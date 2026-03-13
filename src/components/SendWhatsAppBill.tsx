@@ -42,7 +42,8 @@ const SendWhatsAppBill: React.FC<SendWhatsAppBillProps> = ({ order, onBillSent }
       const publicUrl = urlData.publicUrl;
 
       const promoText = `Skip the wait next time! Pre-order 20 mins before you arrive at: ${window.location.origin}`;
-      const message = `Hello! Thank you for dining at Curry Corner. Your total is ₹${order.totalAmount}. Here is your official bill: ${publicUrl}\n\n${promoText}`;
+      const reviewText = `Thank you for choosing Curry Corner! 🍛 If you loved your meal, please take 10 seconds to leave us a 5-star review here: https://g.page/r/YOUR_SHORT_LINK_HERE`;
+      const message = `Hello! Thank you for dining at Curry Corner. Your total is ₹${order.totalAmount}. Here is your official bill: ${publicUrl}\n\n${promoText}\n\n${reviewText}`;
       const cleanPhone = order.userPhone.replace(/\D/g, '');
       const fullPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
       const waUrl = `https://wa.me/${fullPhone}?text=${encodeURIComponent(message)}`;
