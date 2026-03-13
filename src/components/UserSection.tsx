@@ -491,6 +491,14 @@ const UserSection = () => {
           </>
         )}
       </AnimatePresence>
+
+      {/* Footer with Google Review */}
+      {!successPin && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="pt-6 pb-24">
+          <GoogleReviewButton />
+          <p className="text-center text-[11px] text-muted-foreground mt-3">Curry Corner • Ponda, Goa 🍛</p>
+        </motion.div>
+      )}
     </div>
   );
 };
