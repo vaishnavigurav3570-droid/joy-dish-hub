@@ -25,7 +25,29 @@ const OwnerSection = () => {
   const [ownerTab, setOwnerTab] = useState('orders');
   const [previewOrder, setPreviewOrder] = useState<Order | null>(null);
   const [uploadingAR, setUploadingAR] = useState<string | null>(null);
+  const [exportingPDF, setExportingPDF] = useState(false);
   const arFileRef = useRef<HTMLInputElement>(null);
+  const reportRef = useRef<HTMLDivElement>(null);
+
+  const handleExportPDF = useCallback(async () => {
+    if (!reportRef.current) return;
+    setExportingPDF(true);
+    try {
+      const canvas = await html2canvas(reportRef.current, { scale: 2, useCORS: true });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const imgHeight = (canvas.height * pageWidth) / canvas.width;
+      pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, imgHeight);
+      const month = new Date().toLocaleString('default', { month: 'long', year: 'numeric' }).replace(' ', '_');
+      pdf.save(`CurryCorner_Report_${month}.pdf`);
+      toast.success('PDF report downloaded!');
+    } catch {
+      toast.error('Failed to generate PDF');
+    } finally {
+      setExportingPDF(false);
+    }
+  }, []);
 
   const liveOrders = orders.filter(o => o.status !== 'rejected' && o.status !== 'no_show');
   const totalRevenue = orders.reduce((sum, o) => sum + o.totalAmount, 0);
