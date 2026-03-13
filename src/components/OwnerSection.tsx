@@ -277,6 +277,10 @@ const OwnerSection = () => {
 
         {/* Analytics */}
         <TabsContent value="analytics" className="space-y-6 mt-6">
+          <Button onClick={handleExportPDF} disabled={exportingPDF} className="w-full rounded-2xl gradient-warm text-primary-foreground font-bold py-6 text-base shadow-lg">
+            {exportingPDF ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : <FileText className="h-5 w-5 mr-2" />}
+            {exportingPDF ? 'Generating Report…' : '📄 Download PDF Report'}
+          </Button>
           <Card className="p-5 rounded-2xl">
             <h4 className="font-bold text-foreground mb-4 text-base">🏆 Most Ordered Items</h4>
             {orders.length === 0 ? (
