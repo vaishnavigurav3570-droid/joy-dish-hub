@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,600;0,700;0,800;0,900;1,600&display=swap');
 
 @layer base {
   :root {
@@ -50,7 +50,10 @@
     --warning-foreground: 20 10% 12%;
     --success: 155 65% 42%;
     --success-foreground: 0 0% 100%;
+    --info: 210 80% 55%;
+    --info-foreground: 0 0% 100%;
     --surface-warm: 30 40% 96%;
+    --surface-cool: 200 30% 96%;
     --text-display: 'Playfair Display', serif;
     --text-body: 'Outfit', sans-serif;
 
@@ -58,6 +61,16 @@
     --gradient-warm: linear-gradient(135deg, hsl(14 90% 55%), hsl(35 95% 58%));
     --gradient-cool: linear-gradient(135deg, hsl(160 60% 38%), hsl(180 50% 45%));
     --gradient-sunset: linear-gradient(135deg, hsl(350 70% 55%), hsl(14 90% 55%), hsl(40 95% 55%));
+    --gradient-royal: linear-gradient(135deg, hsl(250 60% 55%), hsl(280 65% 60%));
+    --gradient-ocean: linear-gradient(135deg, hsl(200 80% 50%), hsl(210 75% 58%));
+    --gradient-ember: linear-gradient(135deg, hsl(0 75% 50%), hsl(25 90% 55%));
+
+    /* Shadow tokens */
+    --shadow-soft: 0 4px 24px -4px hsl(0 0% 0% / 0.06);
+    --shadow-elevated: 0 12px 40px -8px hsl(0 0% 0% / 0.12);
+    --shadow-warm: 0 8px 32px -8px hsl(14 90% 55% / 0.18);
+    --shadow-glow-primary: 0 0 32px -4px hsl(14 90% 55% / 0.25);
+    --shadow-glow-accent: 0 0 32px -4px hsl(160 60% 38% / 0.25);
   }
 
   .dark {
@@ -92,7 +105,10 @@
     --warning-foreground: 20 10% 12%;
     --success: 155 65% 42%;
     --success-foreground: 0 0% 100%;
+    --info: 210 80% 55%;
+    --info-foreground: 0 0% 100%;
     --surface-warm: 15 18% 9%;
+    --surface-cool: 200 15% 10%;
   }
 }
 
@@ -104,6 +120,8 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--text-body);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   h1, h2, h3 {
@@ -121,14 +139,35 @@
   .gradient-sunset {
     background: var(--gradient-sunset);
   }
+  .gradient-royal {
+    background: var(--gradient-royal);
+  }
+  .gradient-ocean {
+    background: var(--gradient-ocean);
+  }
+  .gradient-ember {
+    background: var(--gradient-ember);
+  }
   .glass {
     @apply bg-card/70 backdrop-blur-xl border border-border/50;
   }
+  .glass-heavy {
+    @apply bg-card/40 backdrop-blur-2xl border border-border/30;
+  }
   .food-card-shadow {
-    box-shadow: 0 8px 32px -8px hsl(14 90% 55% / 0.15), 0 4px 16px -4px hsl(0 0% 0% / 0.08);
+    box-shadow: var(--shadow-warm);
   }
   .stat-glow {
-    box-shadow: 0 0 24px -4px hsl(14 90% 55% / 0.2);
+    box-shadow: var(--shadow-glow-primary);
+  }
+  .stat-glow-accent {
+    box-shadow: var(--shadow-glow-accent);
+  }
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
+  }
+  .shadow-elevated {
+    box-shadow: var(--shadow-elevated);
   }
   .scrollbar-hide {
     -ms-overflow-style: none;
@@ -136,5 +175,57 @@
   }
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+  .text-gradient-warm {
+    background: var(--gradient-warm);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .text-gradient-cool {
+    background: var(--gradient-cool);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Premium card hover */
+  .card-hover {
+    @apply transition-all duration-300 hover:-translate-y-0.5;
+    &:hover {
+      box-shadow: var(--shadow-elevated);
+    }
+  }
+
+  /* Pulse dot */
+  .pulse-dot {
+    @apply relative;
+    &::after {
+      content: '';
+      @apply absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary;
+      animation: pulse-ring 2s ease-out infinite;
+    }
+  }
+
+  @keyframes pulse-ring {
+    0% { box-shadow: 0 0 0 0 hsl(14 90% 55% / 0.5); }
+    70% { box-shadow: 0 0 0 8px hsl(14 90% 55% / 0); }
+    100% { box-shadow: 0 0 0 0 hsl(14 90% 55% / 0); }
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--secondary)) 25%,
+      hsl(var(--muted)) 50%,
+      hsl(var(--secondary)) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
   }
 }
