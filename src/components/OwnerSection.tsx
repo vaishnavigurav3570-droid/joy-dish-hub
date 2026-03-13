@@ -383,5 +383,6 @@ const OwnerSection = () => {
       <MonthlyReportPDF ref={reportRef} orders={orders} />
     </div>
   );
+};
 
 export default OwnerSection;
