@@ -135,9 +135,9 @@ const Auth = () => {
           <Button
             className="w-full gradient-warm text-primary-foreground rounded-xl h-12 text-base font-semibold shadow-lg shadow-primary/20"
             onClick={handleAuth}
-            disabled={loading}
+            disabled={authLoading}
           >
-            {loading ? 'Please wait...' : isSignup ? 'Create Account' : 'Sign In'}
+            {authLoading ? 'Please wait...' : isSignup ? 'Create Account' : 'Sign In'}
           </Button>
 
           <p className="text-center text-sm text-muted-foreground">
