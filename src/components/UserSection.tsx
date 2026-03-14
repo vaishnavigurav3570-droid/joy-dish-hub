@@ -16,7 +16,7 @@ import ARViewerModal from './ARViewerModal';
 import GoogleReviewButton from './GoogleReviewButton';
 
 const UserSection = () => {
-  const { menu, orders, placeOrder, addMoreItems, menuLoading } = useOrders();
+  const { menu, orders, placeOrder, addMoreItems, cancelOrder, menuLoading } = useOrders();
   const { user } = useAuth();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [tableNumber, setTableNumber] = useState('');
