@@ -23,6 +23,7 @@ interface OrderContextType {
   rejectOrder: (orderId: string) => void;
   markReady: (orderId: string) => void;
   markNoShow: (orderId: string) => void;
+  cancelOrder: (orderId: string) => void;
   addMoreItems: (orderId: string, items: CartItem[]) => void;
   markBillSent: (orderId: string) => void;
   updateMenuItemAR: (menuItemId: string, arModelUrl: string) => Promise<void>;
