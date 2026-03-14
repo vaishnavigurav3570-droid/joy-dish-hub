@@ -378,6 +378,8 @@ const UserSection = () => {
               })}
             </motion.div>
           </AnimatePresence>
+            </>
+          )}
         </>
       )}
 
