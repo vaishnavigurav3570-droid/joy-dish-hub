@@ -306,7 +306,14 @@ const UserSection = () => {
       {/* Category Chips */}
       {!successPin && (
         <>
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+          {availableMenu.length === 0 ? (
+            <div className="text-center py-16 space-y-3">
+              <p className="text-4xl">🍽️</p>
+              <p className="text-muted-foreground font-medium">No items available right now</p>
+              <p className="text-xs text-muted-foreground">Check back soon — we're updating the menu!</p>
+            </div>
+          ) : (
+            <>
             {categories.map(cat => (
               <button key={cat} onClick={() => setActiveCategory(cat)} className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 ${
                 activeCategory === cat
