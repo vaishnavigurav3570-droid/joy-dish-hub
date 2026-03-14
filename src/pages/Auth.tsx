@@ -32,7 +32,7 @@ const Auth = () => {
       toast.error('Please enter email and password');
       return;
     }
-    setLoading(true);
+    setAuthLoading(true);
     try {
       if (isSignup) {
         const { data: signUpData, error } = await supabase.auth.signUp({
