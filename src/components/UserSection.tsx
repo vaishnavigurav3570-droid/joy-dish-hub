@@ -54,9 +54,11 @@ const UserSection = () => {
   const isOrderConfirmed = activeOrder && (activeOrder.status === 'confirmed' || activeOrder.status === 'preparing' || activeOrder.status === 'ready');
   const canCancelOrder = activeOrder && activeOrder.status === 'pending';
 
-  if (!activeCategory && categories.length > 0) {
-    setActiveCategory(categories[0]);
-  }
+  useEffect(() => {
+    if (!activeCategory && categories.length > 0) {
+      setActiveCategory(categories[0]);
+    }
+  }, [categories.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const addToCart = (menuItem: typeof menu[0]) => {
     setCart(prev => {
