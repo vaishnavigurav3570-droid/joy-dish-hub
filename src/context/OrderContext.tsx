@@ -219,6 +219,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const rejectOrder = useCallback((id: string) => { updateOrderStatus(id, 'rejected'); }, [updateOrderStatus]);
   const markReady = useCallback((id: string) => { updateOrderStatus(id, 'ready'); }, [updateOrderStatus]);
   const markNoShow = useCallback((id: string) => { updateOrderStatus(id, 'no_show'); }, [updateOrderStatus]);
+  const cancelOrder = useCallback((id: string) => { updateOrderStatus(id, 'cancelled'); }, [updateOrderStatus]);
 
   const addMoreItems = useCallback(async (orderId: string, items: CartItem[]) => {
     const additionalTotal = items.reduce((sum, i) => sum + i.menuItem.price * i.quantity, 0);
