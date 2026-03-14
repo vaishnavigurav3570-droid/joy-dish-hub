@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -11,27 +11,28 @@ import { useNavigate } from 'react-router-dom';
 type RoleTab = 'worker' | 'owner';
 
 const Auth = () => {
-  const { user, role } = useAuth();
+  const { user, role, loading, roleLoading } = useAuth();
   const navigate = useNavigate();
   const [roleTab, setRoleTab] = useState<RoleTab>('worker');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSignup, setIsSignup] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
 
-  // If already logged in as admin, redirect to home
-  if (user && (role === 'worker' || role === 'owner')) {
-    navigate('/');
-    return null;
-  }
+  // Redirect to home when logged in as admin (in useEffect, not during render)
+  useEffect(() => {
+    if (!loading && !roleLoading && user && (role === 'worker' || role === 'owner')) {
+      navigate('/', { replace: true });
+    }
+  }, [user, role, loading, roleLoading, navigate]);
 
   const handleAuth = async () => {
     if (!email || !password) {
       toast.error('Please enter email and password');
       return;
     }
-    setLoading(true);
+    setAuthLoading(true);
     try {
       if (isSignup) {
         const { data: signUpData, error } = await supabase.auth.signUp({
@@ -57,7 +58,7 @@ const Auth = () => {
     } catch (err: any) {
       toast.error(err.message || 'Authentication failed');
     } finally {
-      setLoading(false);
+      setAuthLoading(false);
     }
   };
 
@@ -134,9 +135,9 @@ const Auth = () => {
           <Button
             className="w-full gradient-warm text-primary-foreground rounded-xl h-12 text-base font-semibold shadow-lg shadow-primary/20"
             onClick={handleAuth}
-            disabled={loading}
+            disabled={authLoading}
           >
-            {loading ? 'Please wait...' : isSignup ? 'Create Account' : 'Sign In'}
+            {authLoading ? 'Please wait...' : isSignup ? 'Create Account' : 'Sign In'}
           </Button>
 
           <p className="text-center text-sm text-muted-foreground">
