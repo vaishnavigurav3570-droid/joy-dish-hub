@@ -272,7 +272,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   return (
     <OrderContext.Provider value={{
       menu, orders, menuLoading, toggleMenuAvailability, placeOrder, confirmOrder,
-      rejectOrder, markReady, markNoShow, addMoreItems, markBillSent, updateMenuItemAR,
+      rejectOrder, markReady, markNoShow, cancelOrder, addMoreItems, markBillSent, updateMenuItemAR,
       salesData: MOCK_SALES, topItems,
     }}>
       {children}
