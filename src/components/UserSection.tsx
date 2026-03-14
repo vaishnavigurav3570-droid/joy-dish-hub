@@ -16,7 +16,7 @@ import ARViewerModal from './ARViewerModal';
 import GoogleReviewButton from './GoogleReviewButton';
 
 const UserSection = () => {
-  const { menu, orders, placeOrder, addMoreItems, menuLoading } = useOrders();
+  const { menu, orders, placeOrder, addMoreItems, cancelOrder, menuLoading } = useOrders();
   const { user } = useAuth();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [tableNumber, setTableNumber] = useState('');
@@ -52,6 +52,7 @@ const UserSection = () => {
 
   const activeOrder = orders.find(o => o.id === activeOrderId);
   const isOrderConfirmed = activeOrder && (activeOrder.status === 'confirmed' || activeOrder.status === 'preparing' || activeOrder.status === 'ready');
+  const canCancelOrder = activeOrder && activeOrder.status === 'pending';
 
   if (!activeCategory && categories.length > 0) {
     setActiveCategory(categories[0]);
@@ -231,7 +232,7 @@ const UserSection = () => {
                 📍 Show this PIN at the counter when you arrive to collect your order.
               </p>
               <GoogleReviewButton />
-              <Button className="w-full gradient-warm text-primary-foreground rounded-2xl h-12 font-bold" onClick={() => { setSuccessPin(null); setSuccessOrderId(null); setShowCart(false); }}>
+              <Button className="w-full gradient-warm text-primary-foreground rounded-2xl h-12 font-bold" onClick={() => { setSuccessPin(null); setSuccessOrderId(null); setShowCart(false); setActiveOrderId(successOrderId); }}>
                 Done
               </Button>
             </Card>
@@ -281,79 +282,104 @@ const UserSection = () => {
                   ✨ Order confirmed — you can add more items below!
                 </motion.p>
               )}
+              {canCancelOrder && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-xl text-destructive border-destructive/30 hover:bg-destructive/10 gap-1.5"
+                    onClick={() => {
+                      cancelOrder(activeOrder.id);
+                      setActiveOrderId(null);
+                      toast.success('Order cancelled successfully');
+                    }}
+                  >
+                    <X className="h-3.5 w-3.5" /> Cancel Order
+                  </Button>
+                </motion.div>
+              )}
             </Card>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Category Chips */}
+      {/* Menu */}
       {!successPin && (
         <>
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-            {categories.map(cat => (
-              <button key={cat} onClick={() => setActiveCategory(cat)} className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 ${
-                activeCategory === cat
-                  ? 'gradient-warm text-primary-foreground shadow-lg shadow-primary/20 scale-105'
-                  : 'bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground'
-              }`}>
-                {cat}
-              </button>
-            ))}
-          </motion.div>
+          {availableMenu.length === 0 ? (
+            <div className="text-center py-16 space-y-3">
+              <p className="text-4xl">🍽️</p>
+              <p className="text-muted-foreground font-medium">No items available right now</p>
+              <p className="text-xs text-muted-foreground">Check back soon — we're updating the menu!</p>
+            </div>
+          ) : (
+            <>
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                {categories.map(cat => (
+                  <button key={cat} onClick={() => setActiveCategory(cat)} className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 ${
+                    activeCategory === cat
+                      ? 'gradient-warm text-primary-foreground shadow-lg shadow-primary/20 scale-105'
+                      : 'bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground'
+                  }`}>
+                    {cat}
+                  </button>
+                ))}
+              </motion.div>
 
-          {/* Menu Grid */}
-          <AnimatePresence mode="wait">
-            <motion.div key={activeCategory} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }} className="grid grid-cols-2 gap-4">
-              {availableMenu.filter(i => i.category === activeCategory).map((item, idx) => {
-                const qty = getCartQty(item.id);
-                const hasAR = !!(item as any).ar_model_url;
-                return (
-                  <motion.div key={item.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}>
-                    <Card className="overflow-hidden rounded-2xl hover:food-card-shadow transition-all duration-300 group cursor-pointer border-border/50 hover:border-primary/30 hover:-translate-y-1 active:scale-[0.98]" onClick={() => addToCart(item)}>
-                      <div className="relative h-36 overflow-hidden">
-                        {item.image ? (
-                          <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                            target.parentElement!.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-secondary text-5xl">${item.emoji}</div>`;
-                          }} />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-secondary text-5xl">{item.emoji}</div>
-                        )}
-                        <AnimatePresence>
-                          {qty > 0 && (
-                            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} className="absolute top-2 right-2 gradient-warm text-primary-foreground text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shadow-lg">
-                              {qty}
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-                        <div className="absolute bottom-2 left-3">
-                          <p className="text-white font-bold text-sm drop-shadow-lg">{item.name}</p>
-                        </div>
-                        {hasAR && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setArModel({ url: (item as any).ar_model_url, name: item.name }); }}
-                            className="absolute top-2 left-2 bg-accent text-accent-foreground text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-lg hover:scale-105 transition-transform"
-                          >
-                            <Box className="h-3 w-3" /> View in AR 🧊
-                          </button>
-                        )}
-                      </div>
-                      <div className="p-3 flex items-center justify-between">
-                        <p className="text-primary font-extrabold text-lg">₹{item.price}</p>
-                        <div className={`h-8 w-8 rounded-full flex items-center justify-center transition-all duration-300 ${
-                          qty > 0 ? 'gradient-warm text-primary-foreground shadow-md' : 'bg-primary/10 text-primary group-hover:bg-primary/20'
-                        }`}>
-                          <Plus className="h-4 w-4" />
-                        </div>
-                      </div>
-                    </Card>
-                  </motion.div>
-                );
-              })}
-            </motion.div>
-          </AnimatePresence>
+              <AnimatePresence mode="wait">
+                <motion.div key={activeCategory} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }} className="grid grid-cols-2 gap-4">
+                  {availableMenu.filter(i => i.category === activeCategory).map((item, idx) => {
+                    const qty = getCartQty(item.id);
+                    const hasAR = !!(item as any).ar_model_url;
+                    return (
+                      <motion.div key={item.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}>
+                        <Card className="overflow-hidden rounded-2xl hover:food-card-shadow transition-all duration-300 group cursor-pointer border-border/50 hover:border-primary/30 hover:-translate-y-1 active:scale-[0.98]" onClick={() => addToCart(item)}>
+                          <div className="relative h-36 overflow-hidden">
+                            {item.image ? (
+                              <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                target.parentElement!.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-secondary text-5xl">${item.emoji}</div>`;
+                              }} />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center bg-secondary text-5xl">{item.emoji}</div>
+                            )}
+                            <AnimatePresence>
+                              {qty > 0 && (
+                                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} className="absolute top-2 right-2 gradient-warm text-primary-foreground text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shadow-lg">
+                                  {qty}
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+                            <div className="absolute bottom-2 left-3">
+                              <p className="text-white font-bold text-sm drop-shadow-lg">{item.name}</p>
+                            </div>
+                            {hasAR && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setArModel({ url: (item as any).ar_model_url, name: item.name }); }}
+                                className="absolute top-2 left-2 bg-accent text-accent-foreground text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-lg hover:scale-105 transition-transform"
+                              >
+                                <Box className="h-3 w-3" /> View in AR 🧊
+                              </button>
+                            )}
+                          </div>
+                          <div className="p-3 flex items-center justify-between">
+                            <p className="text-primary font-extrabold text-lg">₹{item.price}</p>
+                            <div className={`h-8 w-8 rounded-full flex items-center justify-center transition-all duration-300 ${
+                              qty > 0 ? 'gradient-warm text-primary-foreground shadow-md' : 'bg-primary/10 text-primary group-hover:bg-primary/20'
+                            }`}>
+                              <Plus className="h-4 w-4" />
+                            </div>
+                          </div>
+                        </Card>
+                      </motion.div>
+                    );
+                  })}
+                </motion.div>
+              </AnimatePresence>
+            </>
+          )}
         </>
       )}
 
@@ -492,10 +518,9 @@ const UserSection = () => {
         )}
       </AnimatePresence>
 
-      {/* Footer with Google Review */}
+      {/* Footer */}
       {!successPin && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="pt-6 pb-24">
-          <GoogleReviewButton />
           <p className="text-center text-[11px] text-muted-foreground mt-3">Curry Corner • Ponda, Goa 🍛</p>
         </motion.div>
       )}

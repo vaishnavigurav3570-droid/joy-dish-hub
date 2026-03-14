@@ -23,6 +23,7 @@ interface OrderContextType {
   rejectOrder: (orderId: string) => void;
   markReady: (orderId: string) => void;
   markNoShow: (orderId: string) => void;
+  cancelOrder: (orderId: string) => void;
   addMoreItems: (orderId: string, items: CartItem[]) => void;
   markBillSent: (orderId: string) => void;
   updateMenuItemAR: (menuItemId: string, arModelUrl: string) => Promise<void>;
@@ -218,6 +219,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const rejectOrder = useCallback((id: string) => { updateOrderStatus(id, 'rejected'); }, [updateOrderStatus]);
   const markReady = useCallback((id: string) => { updateOrderStatus(id, 'ready'); }, [updateOrderStatus]);
   const markNoShow = useCallback((id: string) => { updateOrderStatus(id, 'no_show'); }, [updateOrderStatus]);
+  const cancelOrder = useCallback((id: string) => { updateOrderStatus(id, 'cancelled'); }, [updateOrderStatus]);
 
   const addMoreItems = useCallback(async (orderId: string, items: CartItem[]) => {
     const additionalTotal = items.reduce((sum, i) => sum + i.menuItem.price * i.quantity, 0);
@@ -270,7 +272,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   return (
     <OrderContext.Provider value={{
       menu, orders, menuLoading, toggleMenuAvailability, placeOrder, confirmOrder,
-      rejectOrder, markReady, markNoShow, addMoreItems, markBillSent, updateMenuItemAR,
+      rejectOrder, markReady, markNoShow, cancelOrder, addMoreItems, markBillSent, updateMenuItemAR,
       salesData: MOCK_SALES, topItems,
     }}>
       {children}
