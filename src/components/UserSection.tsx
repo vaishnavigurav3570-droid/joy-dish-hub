@@ -52,6 +52,7 @@ const UserSection = () => {
 
   const activeOrder = orders.find(o => o.id === activeOrderId);
   const isOrderConfirmed = activeOrder && (activeOrder.status === 'confirmed' || activeOrder.status === 'preparing' || activeOrder.status === 'ready');
+  const canCancelOrder = activeOrder && activeOrder.status === 'pending';
 
   if (!activeCategory && categories.length > 0) {
     setActiveCategory(categories[0]);
