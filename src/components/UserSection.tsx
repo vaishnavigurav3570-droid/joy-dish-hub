@@ -232,7 +232,7 @@ const UserSection = () => {
                 📍 Show this PIN at the counter when you arrive to collect your order.
               </p>
               <GoogleReviewButton />
-              <Button className="w-full gradient-warm text-primary-foreground rounded-2xl h-12 font-bold" onClick={() => { setSuccessPin(null); setSuccessOrderId(null); setShowCart(false); }}>
+              <Button className="w-full gradient-warm text-primary-foreground rounded-2xl h-12 font-bold" onClick={() => { setSuccessPin(null); setSuccessOrderId(null); setShowCart(false); setActiveOrderId(successOrderId); }}>
                 Done
               </Button>
             </Card>
