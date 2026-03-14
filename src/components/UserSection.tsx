@@ -282,6 +282,22 @@ const UserSection = () => {
                   ✨ Order confirmed — you can add more items below!
                 </motion.p>
               )}
+              {canCancelOrder && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-xl text-destructive border-destructive/30 hover:bg-destructive/10 gap-1.5"
+                    onClick={() => {
+                      cancelOrder(activeOrder.id);
+                      setActiveOrderId(null);
+                      toast.success('Order cancelled successfully');
+                    }}
+                  >
+                    <X className="h-3.5 w-3.5" /> Cancel Order
+                  </Button>
+                </motion.div>
+              )}
             </Card>
           </motion.div>
         )}
