@@ -50,6 +50,8 @@ const ARViewerModal: React.FC<ARViewerModalProps> = ({ open, onClose, modelUrl, 
               src={modelUrl}
               alt={`3D model of ${itemName}`}
               ar
+              ar-placement="floor"
+              ar-modes="webxr scene-viewer quick-look"
               camera-controls
               auto-rotate
               shadow-intensity="1"
