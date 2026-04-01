@@ -15,6 +15,8 @@ declare global {
         src?: string;
         alt?: string;
         ar?: boolean;
+        'ar-placement'?: string;
+        'ar-modes'?: string;
         'camera-controls'?: boolean;
         'auto-rotate'?: boolean;
         'shadow-intensity'?: string;
