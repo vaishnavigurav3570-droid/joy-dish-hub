@@ -7,10 +7,15 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
   TrendingUp, UtensilsCrossed, BarChart3, Zap, FileText, Download, Eye,
   IndianRupee, ShoppingBag, UserX, Upload, Loader2, Users, AlertTriangle,
   Clock, CheckCircle2, XCircle, ChefHat, ArrowUpRight, ArrowDownRight,
-  CalendarDays, Percent, Star, Package,
+  CalendarDays, Percent, Star, Package, Archive, Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateBillText } from '@/lib/phone';
@@ -23,6 +28,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { startOfDay, isToday, format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 
 const OwnerSection = () => {
   const { orders, menu, toggleMenuAvailability, markBillSent, markNoShow, updateMenuItemAR, salesData, topItems } = useOrders();
@@ -32,6 +38,13 @@ const OwnerSection = () => {
   const [exportingPDF, setExportingPDF] = useState(false);
   const arFileRef = useRef<HTMLInputElement>(null);
   const reportRef = useRef<HTMLDivElement>(null);
+
+  // Archives state
+  const [archiveMonth, setArchiveMonth] = useState(() => format(new Date(), 'yyyy-MM'));
+  const [downloadingCSV, setDownloadingCSV] = useState(false);
+  const [downloadingArchivePDF, setDownloadingArchivePDF] = useState(false);
+  const [deleteConfirmStep, setDeleteConfirmStep] = useState(0); // 0=none, 1=first, 2=second
+  const [deletingMonth, setDeletingMonth] = useState(false);
 
   // ── PDF Export ──
   const handleExportPDF = useCallback(async () => {
@@ -54,10 +67,27 @@ const OwnerSection = () => {
     }
   }, []);
 
-  // ── Computed stats ──
+  // ── Today's orders for dashboard ──
+  const todayOrders = useMemo(() => orders.filter(o => isToday(o.createdAt)), [orders]);
+
+  // ── Computed stats (TODAY only for top cards) ──
+  const todayStats = useMemo(() => {
+    const live = todayOrders.filter(o => o.status !== 'rejected' && o.status !== 'no_show');
+    const totalRevenue = live.reduce((s, o) => s + o.totalAmount, 0);
+    const totalOrders = todayOrders.length;
+    const noShowOrders = todayOrders.filter(o => o.status === 'no_show');
+    const noShowCount = noShowOrders.length;
+    const noShowLoss = noShowOrders.reduce((s, o) => s + o.totalAmount, 0);
+    const avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / (totalOrders - noShowCount || 1)) : 0;
+    const uniqueCustomers = new Set(todayOrders.map(o => o.userPhone)).size;
+    const billsSent = todayOrders.filter(o => o.billSent).length;
+    return { totalRevenue, totalOrders, noShowCount, noShowLoss, avgOrderValue, uniqueCustomers, billsSent };
+  }, [todayOrders]);
+
+  // ── All-time stats for pipeline & analytics ──
   const stats = useMemo(() => {
     const liveOrders = orders.filter(o => o.status !== 'rejected' && o.status !== 'no_show');
-    const totalRevenue = orders.filter(o => o.status !== 'rejected' && o.status !== 'no_show').reduce((s, o) => s + o.totalAmount, 0);
+    const totalRevenue = liveOrders.reduce((s, o) => s + o.totalAmount, 0);
     const totalOrders = orders.length;
     const pendingCount = orders.filter(o => o.status === 'pending').length;
     const confirmedCount = orders.filter(o => o.status === 'confirmed').length;
@@ -73,7 +103,6 @@ const OwnerSection = () => {
     const uniqueCustomers = new Set(orders.map(o => o.userPhone)).size;
     const billsSent = orders.filter(o => o.billSent).length;
 
-    // Top items
     const counts: Record<string, { count: number; revenue: number; emoji: string }> = {};
     orders.filter(o => o.status !== 'rejected').forEach(o => {
       [...o.items, ...o.additionalRequests].forEach(i => {
@@ -95,6 +124,154 @@ const OwnerSection = () => {
       dineInCount: dineInOrders.length, preOrderCount: preOrders.length,
     };
   }, [orders]);
+
+  // ── Archive helpers ──
+  const archiveMonthOptions = useMemo(() => {
+    const opts: { value: string; label: string }[] = [];
+    for (let i = 0; i < 12; i++) {
+      const d = subMonths(new Date(), i);
+      opts.push({ value: format(d, 'yyyy-MM'), label: format(d, 'MMMM yyyy') });
+    }
+    return opts;
+  }, []);
+
+  const archiveOrders = useMemo(() => {
+    const [year, month] = archiveMonth.split('-').map(Number);
+    const start = startOfMonth(new Date(year, month - 1));
+    const end = endOfMonth(new Date(year, month - 1));
+    return orders.filter(o => o.createdAt >= start && o.createdAt <= end);
+  }, [orders, archiveMonth]);
+
+  const archiveLabel = useMemo(() => {
+    const match = archiveMonthOptions.find(o => o.value === archiveMonth);
+    return match?.label || archiveMonth;
+  }, [archiveMonth, archiveMonthOptions]);
+
+  const handleDownloadCSV = useCallback(async () => {
+    if (archiveOrders.length === 0) { toast.error('No orders for this month'); return; }
+    setDownloadingCSV(true);
+    try {
+      const headers = ['Name', 'Phone Number', 'Order ID', 'Amount', 'Date'];
+      const rows = archiveOrders.map(o => [
+        o.customerName || 'Unknown',
+        o.userPhone,
+        o.id,
+        o.totalAmount.toString(),
+        format(o.createdAt, 'yyyy-MM-dd HH:mm'),
+      ]);
+      const csvContent = [headers, ...rows].map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const [y, m] = archiveMonth.split('-');
+      a.download = `CurryCorner_Bills_${archiveLabel.replace(' ', '_')}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('CSV downloaded!');
+    } catch {
+      toast.error('Failed to generate CSV');
+    } finally {
+      setDownloadingCSV(false);
+    }
+  }, [archiveOrders, archiveMonth, archiveLabel]);
+
+  const handleDownloadArchivePDF = useCallback(async () => {
+    if (archiveOrders.length === 0) { toast.error('No orders for this month'); return; }
+    setDownloadingArchivePDF(true);
+    try {
+      const totalRev = archiveOrders.filter(o => o.status !== 'rejected' && o.status !== 'no_show').reduce((s, o) => s + o.totalAmount, 0);
+      const noShowLoss = archiveOrders.filter(o => o.status === 'no_show').reduce((s, o) => s + o.totalAmount, 0);
+      const counts: Record<string, number> = {};
+      archiveOrders.filter(o => o.status !== 'rejected').forEach(o => {
+        [...o.items, ...o.additionalRequests].forEach(i => {
+          counts[i.menuItem.name] = (counts[i.menuItem.name] || 0) + i.quantity;
+        });
+      });
+      const top5 = Object.entries(counts).sort(([, a], [, b]) => b - a).slice(0, 5);
+
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const w = pdf.internal.pageSize.getWidth();
+
+      pdf.setFillColor(229, 81, 0);
+      pdf.rect(0, 0, w, 40, 'F');
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(22);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('The Curry Corner', 20, 22);
+      pdf.setFontSize(11);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`Monthly Summary — ${archiveLabel}`, 20, 32);
+
+      let y = 55;
+      pdf.setTextColor(50, 50, 50);
+      pdf.setFontSize(14);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Summary', 20, y); y += 10;
+      pdf.setFontSize(11);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`Total Monthly Revenue: Rs ${totalRev.toLocaleString()}`, 20, y); y += 8;
+      pdf.text(`Total Orders: ${archiveOrders.length}`, 20, y); y += 8;
+      pdf.text(`Revenue Lost to No-Shows: Rs ${noShowLoss.toLocaleString()}`, 20, y); y += 15;
+
+      pdf.setFontSize(14);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Top 5 Best-Selling Items', 20, y); y += 10;
+      pdf.setFontSize(11);
+      pdf.setFont('helvetica', 'normal');
+      top5.forEach(([name, count], idx) => {
+        pdf.text(`${idx + 1}. ${name} — ${count} sold`, 25, y); y += 7;
+      });
+      if (top5.length === 0) { pdf.text('No items sold this month', 25, y); y += 7; }
+
+      y += 10;
+      pdf.setFontSize(8);
+      pdf.setTextColor(150, 150, 150);
+      pdf.text(`Generated on ${format(new Date(), 'dd MMM yyyy')} — The Curry Corner POS`, 20, y);
+
+      pdf.save(`CurryCorner_Summary_${archiveLabel.replace(' ', '_')}.pdf`);
+      toast.success('PDF summary downloaded!');
+    } catch {
+      toast.error('Failed to generate PDF');
+    } finally {
+      setDownloadingArchivePDF(false);
+    }
+  }, [archiveOrders, archiveLabel]);
+
+  const handleDeleteMonthData = useCallback(async () => {
+    if (archiveOrders.length === 0) { toast.error('No orders to delete'); setDeleteConfirmStep(0); return; }
+    setDeletingMonth(true);
+    try {
+      const [year, month] = archiveMonth.split('-').map(Number);
+      const start = startOfMonth(new Date(year, month - 1)).toISOString();
+      const end = endOfMonth(new Date(year, month - 1)).toISOString();
+
+      // Get order IDs for this month
+      const { data: monthOrders } = await supabase
+        .from('orders')
+        .select('id')
+        .gte('created_at', start)
+        .lte('created_at', end);
+
+      if (monthOrders && monthOrders.length > 0) {
+        const orderIds = monthOrders.map(o => o.id);
+        // Delete order items first
+        for (const oid of orderIds) {
+          await supabase.from('order_items').delete().eq('order_id', oid);
+        }
+        // Delete orders
+        await supabase.from('orders').delete().gte('created_at', start).lte('created_at', end);
+      }
+
+      toast.success(`Deleted ${archiveOrders.length} orders from ${archiveLabel}`);
+      setDeleteConfirmStep(0);
+      // Force refresh via realtime
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete data');
+    } finally {
+      setDeletingMonth(false);
+    }
+  }, [archiveMonth, archiveOrders, archiveLabel]);
 
   const getOrderItems = (order: Order) => [
     ...order.items.map(i => ({ name: i.menuItem.name, qty: i.quantity, price: i.menuItem.price })),
@@ -153,7 +330,7 @@ const OwnerSection = () => {
             <span className="text-gradient-warm">Dashboard</span>
           </h2>
           <p className="text-muted-foreground text-sm mt-1 flex items-center gap-1.5">
-            <Zap className="h-3.5 w-3.5 text-primary" /> The Curry Corner — command center
+            <Zap className="h-3.5 w-3.5 text-primary" /> Today's Overview — {format(new Date(), 'dd MMM yyyy')}
           </p>
         </div>
         <Badge className="bg-accent/15 text-accent border-accent/30 rounded-full px-3 py-1 text-xs font-semibold">
@@ -162,13 +339,13 @@ const OwnerSection = () => {
         </Badge>
       </motion.div>
 
-      {/* Stat Cards Row 1 */}
+      {/* Today's Stat Cards */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { icon: <IndianRupee className="h-4 w-4" />, value: `₹${stats.totalRevenue.toLocaleString()}`, label: 'Total Revenue', gradient: 'from-primary/10 to-primary/5', iconBg: 'gradient-warm', glow: 'stat-glow' },
-          { icon: <ShoppingBag className="h-4 w-4" />, value: stats.totalOrders, label: 'Total Orders', gradient: 'from-accent/10 to-accent/5', iconBg: 'gradient-cool', glow: 'stat-glow-accent' },
-          { icon: <Users className="h-4 w-4" />, value: stats.uniqueCustomers, label: 'Customers', gradient: 'from-info/10 to-info/5', iconBg: 'gradient-ocean', glow: '' },
-          { icon: <IndianRupee className="h-4 w-4" />, value: `₹${stats.avgOrderValue}`, label: 'Avg Order', gradient: 'from-warning/10 to-warning/5', iconBg: 'bg-warning', glow: '' },
+          { icon: <IndianRupee className="h-4 w-4" />, value: `₹${todayStats.totalRevenue.toLocaleString()}`, label: "Today's Revenue", gradient: 'from-primary/10 to-primary/5', iconBg: 'gradient-warm', glow: 'stat-glow' },
+          { icon: <ShoppingBag className="h-4 w-4" />, value: todayStats.totalOrders, label: "Today's Orders", gradient: 'from-accent/10 to-accent/5', iconBg: 'gradient-cool', glow: 'stat-glow-accent' },
+          { icon: <Users className="h-4 w-4" />, value: todayStats.uniqueCustomers, label: 'Customers Today', gradient: 'from-info/10 to-info/5', iconBg: 'gradient-ocean', glow: '' },
+          { icon: <IndianRupee className="h-4 w-4" />, value: `₹${todayStats.avgOrderValue}`, label: 'Avg Order', gradient: 'from-warning/10 to-warning/5', iconBg: 'bg-warning', glow: '' },
         ].map((stat, idx) => (
           <motion.div key={stat.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + idx * 0.05 }}>
             <Card className={`p-4 rounded-2xl bg-gradient-to-br ${stat.gradient} border-border/50 card-hover ${stat.glow}`}>
@@ -203,14 +380,15 @@ const OwnerSection = () => {
       </motion.div>
 
       <Tabs value={ownerTab} onValueChange={setOwnerTab}>
-        <TabsList className="w-full grid grid-cols-4 rounded-2xl bg-secondary/80 p-1 h-auto">
+        <TabsList className="w-full grid grid-cols-5 rounded-2xl bg-secondary/80 p-1 h-auto">
           {[
             { value: 'orders', icon: <UtensilsCrossed className="h-3.5 w-3.5" />, label: 'Orders', count: stats.pendingCount },
             { value: 'menu', icon: <Package className="h-3.5 w-3.5" />, label: 'Menu' },
             { value: 'analytics', icon: <BarChart3 className="h-3.5 w-3.5" />, label: 'Analytics' },
             { value: 'customers', icon: <Users className="h-3.5 w-3.5" />, label: 'Customers' },
+            { value: 'archives', icon: <Archive className="h-3.5 w-3.5" />, label: 'Archives' },
           ].map(tab => (
-            <TabsTrigger key={tab.value} value={tab.value} className="rounded-xl text-[11px] sm:text-sm py-2.5 data-[state=active]:gradient-warm data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg relative">
+            <TabsTrigger key={tab.value} value={tab.value} className="rounded-xl text-[10px] sm:text-sm py-2.5 data-[state=active]:gradient-warm data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg relative">
               {tab.icon}
               <span className="ml-1 hidden sm:inline">{tab.label}</span>
               {tab.count && tab.count > 0 && (
@@ -377,13 +555,11 @@ const OwnerSection = () => {
 
         {/* ═══════ ANALYTICS TAB ═══════ */}
         <TabsContent value="analytics" className="space-y-5 mt-6">
-          {/* Export PDF */}
           <Button onClick={handleExportPDF} disabled={exportingPDF} className="w-full rounded-2xl gradient-warm text-primary-foreground font-bold py-6 text-base shadow-lg shadow-primary/20">
             {exportingPDF ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : <FileText className="h-5 w-5 mr-2" />}
             {exportingPDF ? 'Generating Report…' : '📄 Download PDF Report'}
           </Button>
 
-          {/* Revenue Breakdown */}
           <Card className="p-5 rounded-2xl">
             <h4 className="font-bold text-foreground mb-4 text-base flex items-center gap-2">
               <IndianRupee className="h-4 w-4 text-primary" /> Revenue Breakdown
@@ -413,7 +589,6 @@ const OwnerSection = () => {
             )}
           </Card>
 
-          {/* Top Items */}
           <Card className="p-5 rounded-2xl">
             <h4 className="font-bold text-foreground mb-4 text-base flex items-center gap-2">
               <Star className="h-4 w-4 text-warning" /> Best Sellers
@@ -448,7 +623,6 @@ const OwnerSection = () => {
             )}
           </Card>
 
-          {/* Quick Metrics Row */}
           <div className="grid grid-cols-2 gap-3">
             <Card className="p-4 rounded-2xl text-center">
               <Percent className="h-4 w-4 text-accent mx-auto mb-1" />
@@ -456,13 +630,12 @@ const OwnerSection = () => {
               <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Bills Sent</p>
             </Card>
             <Card className="p-4 rounded-2xl text-center">
-              <ArrowUpRight className="h-4 w-4 text-success mx-auto mb-1" />
+              <ArrowUpRight className="h-4 w-4 text-accent mx-auto mb-1" />
               <p className="text-lg font-black text-foreground">{menu.filter(m => m.available).length}/{menu.length}</p>
               <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Menu Active</p>
             </Card>
           </div>
 
-          {/* All Bills */}
           <Card className="p-5 rounded-2xl">
             <h4 className="font-bold text-foreground mb-4 text-base flex items-center gap-2">
               <FileText className="h-4 w-4 text-muted-foreground" /> All Bills
@@ -565,7 +738,6 @@ const OwnerSection = () => {
             )}
           </Card>
 
-          {/* Customer Summary */}
           <div className="grid grid-cols-3 gap-3">
             <Card className="p-4 rounded-2xl text-center">
               <p className="text-lg font-black text-foreground">{stats.uniqueCustomers}</p>
@@ -591,7 +763,131 @@ const OwnerSection = () => {
             </Card>
           </div>
         </TabsContent>
+
+        {/* ═══════ ARCHIVES TAB ═══════ */}
+        <TabsContent value="archives" className="space-y-5 mt-6">
+          <Card className="p-5 rounded-2xl space-y-5">
+            <div>
+              <h4 className="font-bold text-foreground text-base flex items-center gap-2 mb-1">
+                <Archive className="h-4 w-4 text-primary" /> Monthly Archives
+              </h4>
+              <p className="text-sm text-muted-foreground">Download reports or manage historical order data</p>
+            </div>
+
+            {/* Month Selector */}
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Select Month</label>
+              <Select value={archiveMonth} onValueChange={setArchiveMonth}>
+                <SelectTrigger className="rounded-xl h-12">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {archiveMonthOptions.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-2">
+                {archiveLabel}: <span className="font-bold text-foreground">{archiveOrders.length}</span> orders • ₹
+                <span className="font-bold text-primary">
+                  {archiveOrders.filter(o => o.status !== 'rejected' && o.status !== 'no_show').reduce((s, o) => s + o.totalAmount, 0).toLocaleString()}
+                </span> revenue
+              </p>
+            </div>
+
+            {/* Download CSV */}
+            <Button
+              onClick={handleDownloadCSV}
+              disabled={downloadingCSV || archiveOrders.length === 0}
+              className="w-full rounded-xl h-12 font-semibold gradient-cool text-accent-foreground"
+            >
+              {downloadingCSV ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+              Download Detailed Bills (CSV)
+            </Button>
+
+            {/* Download PDF */}
+            <Button
+              onClick={handleDownloadArchivePDF}
+              disabled={downloadingArchivePDF || archiveOrders.length === 0}
+              className="w-full rounded-xl h-12 font-semibold gradient-warm text-primary-foreground"
+            >
+              {downloadingArchivePDF ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+              Download Monthly Summary (PDF)
+            </Button>
+
+            {/* Danger Zone */}
+            <div className="border-2 border-destructive/20 rounded-xl p-4 space-y-3 bg-destructive/5">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+                <p className="text-sm font-bold text-destructive">Danger Zone</p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Permanently delete all <span className="font-bold text-foreground">{archiveOrders.length}</span> orders from {archiveLabel}. This action cannot be undone.
+              </p>
+              <Button
+                variant="destructive"
+                className="w-full rounded-xl h-11 font-semibold"
+                disabled={archiveOrders.length === 0 || deletingMonth}
+                onClick={() => setDeleteConfirmStep(1)}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete {archiveLabel} Data
+              </Button>
+            </div>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      {/* Delete Confirmation Step 1 */}
+      <AlertDialog open={deleteConfirmStep === 1} onOpenChange={(open) => !open && setDeleteConfirmStep(0)}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" /> Delete {archiveLabel} Data?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete <span className="font-bold">{archiveOrders.length} orders</span> from {archiveLabel}. 
+              This action cannot be undone. Are you sure you want to proceed?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl"
+              onClick={(e) => { e.preventDefault(); setDeleteConfirmStep(2); }}
+            >
+              Yes, continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Confirmation Step 2 (Final) */}
+      <AlertDialog open={deleteConfirmStep === 2} onOpenChange={(open) => !open && setDeleteConfirmStep(0)}>
+        <AlertDialogContent className="rounded-2xl border-destructive/30">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" /> Are you ABSOLUTELY sure?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p className="font-bold text-destructive">⚠️ This cannot be undone.</p>
+              <p>You are about to permanently delete <span className="font-bold">{archiveOrders.length} orders</span> and all associated items from <span className="font-bold">{archiveLabel}</span>.</p>
+              <p>All revenue data, customer records, and bill history for this month will be lost forever.</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl" onClick={() => setDeleteConfirmStep(0)}>Go back</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl"
+              disabled={deletingMonth}
+              onClick={(e) => { e.preventDefault(); handleDeleteMonthData(); }}
+            >
+              {deletingMonth ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Delete permanently
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Bill Preview Dialog */}
       <Dialog open={!!previewOrder} onOpenChange={() => setPreviewOrder(null)}>
@@ -621,7 +917,7 @@ const OwnerSection = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Hidden PDF Report */}
+      {/* Hidden PDF report for export */}
       <MonthlyReportPDF ref={reportRef} orders={orders} />
     </div>
   );
