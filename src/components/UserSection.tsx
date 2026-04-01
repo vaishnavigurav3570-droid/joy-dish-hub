@@ -96,10 +96,20 @@ const UserSection = () => {
         redirect_uri: window.location.origin,
       });
       if (result.error) {
-        toast.error('Google sign-in failed');
+        const msg = result.error?.message || '';
+        if (msg.includes('404') || msg.includes('configuration') || msg.includes('not found')) {
+          toast.error('Login configuration error. Please contact the admin.');
+        } else {
+          toast.error('Google sign-in failed. Please try again.');
+        }
       }
-    } catch {
-      toast.error('Google sign-in failed');
+    } catch (err: any) {
+      const msg = err?.message || '';
+      if (msg.includes('404') || msg.includes('configuration') || msg.includes('not found')) {
+        toast.error('Login configuration error. Please contact the admin.');
+      } else {
+        toast.error('Google sign-in failed. Please try again.');
+      }
     } finally {
       setSigningIn(false);
     }
