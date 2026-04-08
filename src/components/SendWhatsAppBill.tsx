@@ -51,9 +51,9 @@ const SendWhatsAppBill: React.FC<SendWhatsAppBillProps> = ({ order, onBillSent }
       window.open(waUrl, '_blank');
       onBillSent?.();
       toast.success('Bill sent via WhatsApp!');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('WhatsApp bill error:', err);
-      toast.error(err.message || 'Failed to send bill');
+      toast.error((err as Error).message || 'Failed to send bill');
     } finally {
       setLoading(false);
     }

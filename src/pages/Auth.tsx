@@ -44,6 +44,7 @@ const Auth = () => {
         const newUser = signUpData?.user;
         if (newUser) {
           await new Promise(r => setTimeout(r, 500));
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const { error: roleError } = await (supabase as any).from('user_roles').insert({ user_id: newUser.id, role: roleTab });
           if (roleError) console.error('Role assignment error:', roleError);
         }
@@ -55,8 +56,8 @@ const Auth = () => {
         toast.success('Welcome back!');
         navigate('/');
       }
-    } catch (err: any) {
-      toast.error(err.message || 'Authentication failed');
+    } catch (err: unknown) {
+      toast.error((err as Error).message || 'Authentication failed');
     } finally {
       setAuthLoading(false);
     }

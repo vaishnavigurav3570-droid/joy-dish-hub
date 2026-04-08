@@ -1,4 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MenuItem, Order, CartItem, OrderType } from '@/types/order';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
@@ -145,7 +147,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const toggleMenuAvailability = useCallback(async (id: string) => {
     const item = menu.find(m => m.id === id);
     if (!item) return;
-    setMenu(prev => prev.map(m => m.id === id ? { ...m, available: !m.available } : m));
+    queryClient.setQueryData(['menu'], (prev: any) => prev?.map((m: any) => m.id === id ? { ...m, available: !m.available } : m) || []);
     await supabase.from('menu_items').update({ available: !item.available }).eq('id', id);
   }, [menu]);
 
@@ -201,14 +203,14 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       orderType,
       pickupPin,
     };
-    setOrders(prev => [order, ...prev]);
+    queryClient.setQueryData(['orders'], (prev: any) => [order, ...(prev || [])]);
     setDbOrderMap(prev => ({ ...prev, [orderNumber]: orderData.id }));
 
     return { orderNumber, pickupPin };
   }, [user]);
 
   const updateOrderStatus = useCallback(async (orderNumber: string, status: string) => {
-    setOrders(prev => prev.map(o => o.id === orderNumber ? { ...o, status: status as any } : o));
+    queryClient.setQueryData(['orders'], (prev: any) => prev?.map((o: any) => o.id === orderNumber ? { ...o, status: status as any } : o) || []);
     const dbId = dbOrderMap[orderNumber];
     if (dbId) {
       await supabase.from('orders').update({ status }).eq('id', dbId);
@@ -223,7 +225,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const addMoreItems = useCallback(async (orderId: string, items: CartItem[]) => {
     const additionalTotal = items.reduce((sum, i) => sum + i.menuItem.price * i.quantity, 0);
-    setOrders(prev => prev.map(o => {
+    queryClient.setQueryData(['orders'], (prev: any) => prev?.map((o: any) => {
       if (o.id !== orderId) return o;
       return { ...o, additionalRequests: [...o.additionalRequests, ...items], totalAmount: o.totalAmount + additionalTotal };
     }));
@@ -247,7 +249,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [dbOrderMap, orders]);
 
   const markBillSent = useCallback(async (orderId: string) => {
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, billSent: true } : o));
+    queryClient.setQueryData(['orders'], (prev: any) => prev?.map((o: any) => o.id === orderId ? { ...o, billSent: true } : o) || []);
     const dbId = dbOrderMap[orderId];
     if (dbId) {
       await supabase.from('orders').update({ bill_sent: true }).eq('id', dbId);

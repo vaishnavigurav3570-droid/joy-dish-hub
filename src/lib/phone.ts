@@ -3,7 +3,7 @@
  * Accepts optional +91 or 91 prefix.
  */
 export function validateIndianPhone(phone: string): { valid: boolean; cleaned: string; error?: string } {
-  const cleaned = phone.replace(/[\s\-\(\)]/g, '');
+  const cleaned = phone.replace(/[\s\-()]/g, '');
   const match = cleaned.match(/^(?:\+?91)?([6-9]\d{9})$/);
   if (!match) {
     return { valid: false, cleaned, error: 'Enter a valid 10-digit Indian mobile number' };

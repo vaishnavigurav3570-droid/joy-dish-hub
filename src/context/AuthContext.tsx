@@ -34,6 +34,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const fetchRole = useCallback(async (userId: string) => {
     setRoleLoading(true);
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data } = await (supabase as any).from('user_roles').select('role').eq('user_id', userId).maybeSingle();
       if (data?.role) {
         setRole(data.role as AppRole);
