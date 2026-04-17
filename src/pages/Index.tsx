@@ -5,7 +5,7 @@ import { OrderProvider } from '@/context/OrderContext';
 const UserSection = lazy(() => import('@/components/UserSection'));
 const WorkerSection = lazy(() => import('@/components/WorkerSection'));
 const OwnerSection = lazy(() => import('@/components/OwnerSection'));
-import { ChefHat, Crown, LogOut, Lock } from 'lucide-react';
+import { ChefHat, Crown, LogOut, Lock, Utensils } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
@@ -13,9 +13,10 @@ import { useNavigate } from 'react-router-dom';
 const ADMIN_TABS = [
   { id: 'worker' as const, label: 'Kitchen', icon: ChefHat, roles: ['worker', 'owner'] },
   { id: 'owner' as const, label: 'Owner', icon: Crown, roles: ['owner'] },
+  { id: 'customer' as const, label: 'Customer View', icon: Utensils, roles: ['worker', 'owner'] },
 ];
 
-type TabId = 'worker' | 'owner';
+type TabId = 'worker' | 'owner' | 'customer';
 
 const Index = () => {
   const { user, role, isGuest, loading, roleLoading, setGuestMode, signOut } = useAuth();
@@ -126,6 +127,7 @@ const AdminView = ({ role }: { role: string }) => {
       <Suspense fallback={<div className="p-8 flex justify-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>}>
         {activeTab === 'worker' && <WorkerSection />}
         {activeTab === 'owner' && <OwnerSection />}
+        {activeTab === 'customer' && <UserSection />}
       </Suspense>
     </div>
   );
