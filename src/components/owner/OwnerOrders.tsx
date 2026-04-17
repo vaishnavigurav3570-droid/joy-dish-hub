@@ -21,6 +21,7 @@ const statusConfig: Record<string, { icon: React.ReactNode; label: string; class
   confirmed: { icon: <ChefHat className="h-3 w-3" />, label: 'Preparing', classes: 'gradient-warm text-primary-foreground' },
   ready: { icon: <CheckCircle2 className="h-3 w-3" />, label: 'Ready', classes: 'gradient-cool text-accent-foreground' },
   rejected: { icon: <XCircle className="h-3 w-3" />, label: 'Rejected', classes: 'bg-destructive/15 text-destructive' },
+  cancelled: { icon: <XCircle className="h-3 w-3" />, label: 'Cancelled', classes: 'bg-muted text-muted-foreground' },
   no_show: { icon: <UserX className="h-3 w-3" />, label: 'No-Show', classes: 'bg-destructive/15 text-destructive' },
 };
 

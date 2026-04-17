@@ -63,12 +63,14 @@ export function UserActiveOrder({ activeOrder, successPin, isOrderConfirmed, can
                   activeOrder.status === 'pending' ? 'bg-warning/15 text-warning border-warning/30' :
                   activeOrder.status === 'confirmed' ? 'gradient-warm text-primary-foreground' :
                   activeOrder.status === 'ready' ? 'gradient-cool text-accent-foreground' :
-                  activeOrder.status === 'rejected' ? 'bg-destructive/15 text-destructive' : ''
+                  activeOrder.status === 'rejected' ? 'bg-destructive/15 text-destructive' :
+                  activeOrder.status === 'cancelled' ? 'bg-muted text-muted-foreground' : ''
                 }`}>
                   {activeOrder.status === 'pending' && '⏳ Waiting for Kitchen'}
                   {activeOrder.status === 'confirmed' && '👨‍🍳 Being Prepared'}
                   {activeOrder.status === 'ready' && '✅ Ready for Pickup!'}
                   {activeOrder.status === 'rejected' && '❌ Rejected'}
+                  {activeOrder.status === 'cancelled' && '🚫 Cancelled'}
                 </Badge>
               </motion.div>
             </div>

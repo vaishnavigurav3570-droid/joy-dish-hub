@@ -1,6 +1,7 @@
 import { Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+// TODO: Replace with your actual Google Place ID from Google Business Profile
 const GOOGLE_REVIEW_URL = 'https://search.google.com/local/writereview?placeid=YOUR_GOOGLE_PLACE_ID_HERE';
 
 const GoogleReviewButton = () => (

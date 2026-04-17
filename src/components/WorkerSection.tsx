@@ -44,17 +44,21 @@ const WorkerSection = () => {
 
       {/* Stats */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="grid grid-cols-3 gap-3">
-        {[
-          { count: pendingOrders.length, label: 'Pending', color: 'warning', icon: Clock },
-          { count: activeOrders.length, label: 'Cooking', color: 'primary', icon: Flame },
-          { count: readyOrders.length, label: 'Ready', color: 'accent', icon: Check },
-        ].map(stat => (
-          <Card key={stat.label} className={`p-4 text-center rounded-2xl border-${stat.color}/20 bg-gradient-to-br from-${stat.color}/5 to-${stat.color}/10`}>
-            <stat.icon className={`h-4 w-4 text-${stat.color} mx-auto mb-1`} />
-            <motion.p key={stat.count} initial={{ scale: 1.3 }} animate={{ scale: 1 }} className={`text-3xl font-extrabold text-${stat.color}`}>{stat.count}</motion.p>
-            <p className="text-[10px] text-muted-foreground mt-1 font-medium uppercase tracking-wider">{stat.label}</p>
-          </Card>
-        ))}
+        <Card className="p-4 text-center rounded-2xl border-warning/20 bg-gradient-to-br from-warning/5 to-warning/10">
+          <Clock className="h-4 w-4 text-warning mx-auto mb-1" />
+          <motion.p key={pendingOrders.length} initial={{ scale: 1.3 }} animate={{ scale: 1 }} className="text-3xl font-extrabold text-warning">{pendingOrders.length}</motion.p>
+          <p className="text-[10px] text-muted-foreground mt-1 font-medium uppercase tracking-wider">Pending</p>
+        </Card>
+        <Card className="p-4 text-center rounded-2xl border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+          <Flame className="h-4 w-4 text-primary mx-auto mb-1" />
+          <motion.p key={activeOrders.length} initial={{ scale: 1.3 }} animate={{ scale: 1 }} className="text-3xl font-extrabold text-primary">{activeOrders.length}</motion.p>
+          <p className="text-[10px] text-muted-foreground mt-1 font-medium uppercase tracking-wider">Cooking</p>
+        </Card>
+        <Card className="p-4 text-center rounded-2xl border-accent/20 bg-gradient-to-br from-accent/5 to-accent/10">
+          <Check className="h-4 w-4 text-accent mx-auto mb-1" />
+          <motion.p key={readyOrders.length} initial={{ scale: 1.3 }} animate={{ scale: 1 }} className="text-3xl font-extrabold text-accent">{readyOrders.length}</motion.p>
+          <p className="text-[10px] text-muted-foreground mt-1 font-medium uppercase tracking-wider">Ready</p>
+        </Card>
       </motion.div>
 
       {/* Pending Orders */}

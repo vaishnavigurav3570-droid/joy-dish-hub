@@ -20,7 +20,7 @@ export interface Order {
   id: string;
   tableNumber: number;
   items: CartItem[];
-  status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'rejected' | 'no_show';
+  status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'rejected' | 'cancelled' | 'no_show';
   createdAt: Date;
   userPhone: string;
   customerName: string;

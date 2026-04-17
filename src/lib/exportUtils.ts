@@ -2,7 +2,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { format } from 'date-fns';
 import { Order } from '@/types/order';
-import React from 'react';
+import type React from 'react';
 
 export const exportPDFReport = async (reportRef: React.RefObject<HTMLDivElement>) => {
   if (!reportRef.current) throw new Error("No report ref");

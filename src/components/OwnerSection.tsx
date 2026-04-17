@@ -7,15 +7,10 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  TrendingUp, UtensilsCrossed, BarChart3, Zap, FileText, Download, Eye,
-  IndianRupee, ShoppingBag, UserX, Upload, Loader2, Users, AlertTriangle,
-  Clock, CheckCircle2, XCircle, ChefHat, ArrowUpRight, ArrowDownRight,
-  CalendarDays, Percent, Star, Package, Archive, Trash2,
+  UtensilsCrossed, BarChart3, Zap, FileText, Download, Eye,
+  IndianRupee, ShoppingBag, UserX, Users,
+  Clock, CheckCircle2, XCircle, ChefHat,
+  Package, Archive, Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateBillText } from '@/lib/phone';
@@ -55,7 +50,6 @@ const OwnerSection = () => {
     setExportingPDF(true);
     try {
       await exportPDFReport(reportRef);
-      toast.success('PDF report downloaded!');
       toast.success('PDF report downloaded!');
     } catch {
       toast.error('Failed to generate PDF');
@@ -250,6 +244,7 @@ const OwnerSection = () => {
     confirmed: { icon: <ChefHat className="h-3 w-3" />, label: 'Preparing', classes: 'gradient-warm text-primary-foreground' },
     ready: { icon: <CheckCircle2 className="h-3 w-3" />, label: 'Ready', classes: 'gradient-cool text-accent-foreground' },
     rejected: { icon: <XCircle className="h-3 w-3" />, label: 'Rejected', classes: 'bg-destructive/15 text-destructive' },
+    cancelled: { icon: <XCircle className="h-3 w-3" />, label: 'Cancelled', classes: 'bg-muted text-muted-foreground' },
     no_show: { icon: <UserX className="h-3 w-3" />, label: 'No-Show', classes: 'bg-destructive/15 text-destructive' },
   };
 
@@ -387,57 +382,6 @@ const OwnerSection = () => {
           />
         </TabsContent>
       </Tabs>
-
-      {/* Delete Confirmation Step 1 */}
-      <AlertDialog open={deleteConfirmStep === 1} onOpenChange={(open) => !open && setDeleteConfirmStep(0)}>
-        <AlertDialogContent className="rounded-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
-              <AlertTriangle className="h-5 w-5" /> Delete {archiveLabel} Data?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete <span className="font-bold">{archiveOrders.length} orders</span> from {archiveLabel}. 
-              This action cannot be undone. Are you sure you want to proceed?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl"
-              onClick={(e) => { e.preventDefault(); setDeleteConfirmStep(2); }}
-            >
-              Yes, continue
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Delete Confirmation Step 2 (Final) */}
-      <AlertDialog open={deleteConfirmStep === 2} onOpenChange={(open) => !open && setDeleteConfirmStep(0)}>
-        <AlertDialogContent className="rounded-2xl border-destructive/30">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
-              <Trash2 className="h-5 w-5" /> Are you ABSOLUTELY sure?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <p className="font-bold text-destructive">⚠️ This cannot be undone.</p>
-              <p>You are about to permanently delete <span className="font-bold">{archiveOrders.length} orders</span> and all associated items from <span className="font-bold">{archiveLabel}</span>.</p>
-              <p>All revenue data, customer records, and bill history for this month will be lost forever.</p>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-xl" onClick={() => setDeleteConfirmStep(0)}>Go back</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl"
-              disabled={deletingMonth}
-              onClick={(e) => { e.preventDefault(); handleDeleteMonthData(); }}
-            >
-              {deletingMonth ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
-              Delete permanently
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Bill Preview Dialog */}
       <Dialog open={!!previewOrder} onOpenChange={() => setPreviewOrder(null)}>
