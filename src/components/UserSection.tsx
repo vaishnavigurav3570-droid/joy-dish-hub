@@ -11,7 +11,7 @@ import { Plus, Minus, ShoppingCart, Send, PackagePlus, Flame, AlertCircle, Loade
 import { toast } from 'sonner';
 import { validateIndianPhone } from '@/lib/phone';
 import { motion, AnimatePresence } from 'framer-motion';
-import { lovable } from '@/integrations/lovable/index';
+import { supabase } from '@/integrations/supabase/client';
 import ARViewerModal from './ARViewerModal';
 import GoogleReviewButton from './GoogleReviewButton';
 import { UserHero } from './user/UserHero';
@@ -96,24 +96,15 @@ const UserSection = () => {
   const handleGoogleLogin = async () => {
     setSigningIn(true);
     try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
-      });
-      if (result.error) {
-        const msg = result.error?.message || '';
-        if (msg.includes('404') || msg.includes('configuration') || msg.includes('not found')) {
-          toast.error('Login configuration error. Please contact the admin.');
-        } else {
-          toast.error('Google sign-in failed. Please try again.');
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin,
         }
-      }
+      });
+      if (error) throw error;
     } catch (err: unknown) {
-      const msg = (err as Error)?.message || '';
-      if (msg.includes('404') || msg.includes('configuration') || msg.includes('not found')) {
-        toast.error('Login configuration error. Please contact the admin.');
-      } else {
-        toast.error('Google sign-in failed. Please try again.');
-      }
+      toast.error((err as Error)?.message || 'Google sign-in failed. Please try again.');
     } finally {
       setSigningIn(false);
     }

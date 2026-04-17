@@ -49,12 +49,13 @@ const Auth = () => {
           if (roleError) console.error('Role assignment error:', roleError);
         }
         toast.success('Account created! You are now logged in.');
-        navigate('/');
+        // Force reload to let AuthContext fetch the newly inserted role properly
+        window.location.href = '/';
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         toast.success('Welcome back!');
-        navigate('/');
+        // We do NOT navigate here manually. We let the useEffect handle it once AuthContext loads fully!
       }
     } catch (err: unknown) {
       toast.error((err as Error).message || 'Authentication failed');
