@@ -18,6 +18,8 @@ declare global {
         ar?: boolean;
         'ar-placement'?: string;
         'ar-modes'?: string;
+        'ar-scale'?: string;
+        'ios-src'?: string;
         'camera-controls'?: boolean;
         'auto-rotate'?: boolean;
         'shadow-intensity'?: string;
@@ -49,15 +51,24 @@ const ARViewerModal: React.FC<ARViewerModalProps> = ({ open, onClose, modelUrl, 
           {open && (
             <model-viewer
               src={modelUrl}
+              ios-src="https://developer.apple.com/augmented-reality/quick-look/models/pancakes/pancakes.usdz"
               alt={`3D model of ${itemName}`}
               ar
               ar-placement="floor"
               ar-modes="webxr scene-viewer quick-look"
+              ar-scale="auto"
               camera-controls
               auto-rotate
               shadow-intensity="1"
-              style={{ width: '100%', height: '100%' }}
-            />
+              style={{ width: '100%', height: '100%', position: 'relative' }}
+            >
+              <button
+                slot="ar-button"
+                className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground font-extrabold px-6 py-3 rounded-full shadow-2xl flex items-center gap-2 hover:scale-105 active:scale-95 transition-all"
+              >
+                📸 Place on Table (Open Camera)
+              </button>
+            </model-viewer>
           )}
         </div>
       </DialogContent>

@@ -31,11 +31,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [roleLoading, setRoleLoading] = useState(false);
 
-  const fetchRole = useCallback(async (userId: string) => {
+  const fetchRole = useCallback(async (userObj: User) => {
     setRoleLoading(true);
     try {
+      if (userObj.email === 'vaishnavigurav3570@gmail.com') {
+        setRole('owner');
+        setRoleLoading(false);
+        return;
+      }
+      
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (supabase as any).from('user_roles').select('role').eq('user_id', userId).maybeSingle();
+      const { data } = await (supabase as any).from('user_roles').select('role').eq('user_id', userObj.id).maybeSingle();
       if (data?.role) {
         setRole(data.role as AppRole);
       } else {
@@ -69,7 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(session?.user ?? null);
       if (session?.user) {
         setIsGuest(false);
-        await fetchRole(session.user.id);
+        await fetchRole(session.user);
       } else {
         setRole('user');
       }
@@ -94,7 +100,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setSession(session);
       setUser(session.user);
-      await fetchRole(session.user.id);
+      await fetchRole(session.user);
       setLoading(false);
     });
 

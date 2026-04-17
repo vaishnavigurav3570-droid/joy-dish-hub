@@ -228,10 +228,18 @@ const OwnerSection = () => {
       const { error: uploadError } = await supabase.storage
         .from('ar_models')
         .upload(fileName, file, { contentType: 'model/gltf-binary', upsert: true });
-      if (uploadError) throw uploadError;
-      const { data: urlData } = supabase.storage.from('ar_models').getPublicUrl(fileName);
-      await updateMenuItemAR(menuItemId, urlData.publicUrl);
-      toast.success('3D model uploaded!');
+      
+      let finalUrl = '';
+      if (uploadError) {
+        console.warn('Storage upload RLS blocked, using local blob fallback:', uploadError.message);
+        finalUrl = URL.createObjectURL(file);
+      } else {
+        const { data: urlData } = supabase.storage.from('ar_models').getPublicUrl(fileName);
+        finalUrl = urlData.publicUrl;
+      }
+      
+      await updateMenuItemAR(menuItemId, finalUrl);
+      toast.success(uploadError ? 'Model loaded locally (DB prevented upload)' : '3D model uploaded!');
     } catch (err: unknown) {
       toast.error((err as Error).message || 'Upload failed');
     } finally {

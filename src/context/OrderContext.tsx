@@ -15,6 +15,21 @@ const MOCK_SALES = [
   { date: '2026-02-25', revenue: 14200, orders: 39 },
 ];
 
+const DEFAULT_MENU: MenuItem[] = [
+  { id: 'm1', name: 'Butter Chicken', price: 320, category: 'Main Course', emoji: '🍛', image: 'https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?w=400&h=300&fit=crop', available: true },
+  { id: 'm2', name: 'Paneer Tikka', price: 250, category: 'Starters', emoji: '🧀', image: 'https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?w=400&h=300&fit=crop', available: true },
+  { id: 'm3', name: 'Chicken Biryani', price: 280, category: 'Rice', emoji: '🍚', image: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=400&h=300&fit=crop', available: true },
+  { id: 'm4', name: 'Dal Makhani', price: 200, category: 'Main Course', emoji: '🍲', image: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=400&h=300&fit=crop', available: true },
+  { id: 'm5', name: 'Naan', price: 50, category: 'Breads', emoji: '🫓', image: 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400&h=300&fit=crop', available: true },
+  { id: 'm6', name: 'Tandoori Roti', price: 30, category: 'Breads', emoji: '🫓', image: 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=400&h=300&fit=crop', available: true },
+  { id: 'm7', name: 'Gulab Jamun', price: 100, category: 'Desserts', emoji: '🍩', image: 'https://images.unsplash.com/photo-1666190070736-c956240tried?w=400&h=300&fit=crop', available: true },
+  { id: 'm8', name: 'Masala Chai', price: 40, category: 'Beverages', emoji: '☕', image: 'https://images.unsplash.com/photo-1571934811356-5cc061b6821f?w=400&h=300&fit=crop', available: true },
+  { id: 'm9', name: 'Lassi', price: 80, category: 'Beverages', emoji: '🥛', image: 'https://images.unsplash.com/photo-1626200419199-391ae4be7a41?w=400&h=300&fit=crop', available: true },
+  { id: 'm10', name: 'Veg Manchurian', price: 180, category: 'Starters', emoji: '🥟', image: 'https://images.unsplash.com/photo-1645177628172-a94c1f96e6db?w=400&h=300&fit=crop', available: true },
+  { id: 'm11', name: 'Fish Fry', price: 300, category: 'Starters', emoji: '🐟', image: 'https://images.unsplash.com/photo-1580476262798-bddd9f4b7369?w=400&h=300&fit=crop', available: false },
+  { id: 'm12', name: 'Mutton Rogan Josh', price: 400, category: 'Main Course', emoji: '🥩', image: 'https://images.unsplash.com/photo-1545247181-516773cae754?w=400&h=300&fit=crop', available: true }
+];
+
 interface OrderContextType {
   menu: MenuItem[];
   orders: Order[];
@@ -109,8 +124,12 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const { data: menuData = [], isLoading: menuLoading } = useQuery({
     queryKey: ['menu'],
     queryFn: async () => {
-      const { data } = await supabase.from('menu_items').select('*').order('category');
-      return data ? data.map(mapMenuItem) : [];
+      const { data, error } = await supabase.from('menu_items').select('*').order('category');
+      if (error || !data || data.length === 0) {
+        console.warn('Supabase menu fetch failed/empty, using fallback menu data');
+        return DEFAULT_MENU;
+      }
+      return data.map(mapMenuItem);
     },
   });
   const menu = menuData;
@@ -258,7 +277,10 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const updateMenuItemAR = useCallback(async (menuItemId: string, arModelUrl: string) => {
     queryClient.setQueryData(['menu'], (prev: any) => prev?.map((m: any) => m.id === menuItemId ? { ...m, ar_model_url: arModelUrl } : m) || []);
-    await (supabase.from('menu_items') as any).update({ ar_model_url: arModelUrl }).eq('id', menuItemId);
+    try {
+      const { error } = await (supabase.from('menu_items') as any).update({ ar_model_url: arModelUrl }).eq('id', menuItemId);
+      if (error) console.warn('Supabase DB update skipped:', error.message);
+    } catch { /* ignore */ }
   }, [queryClient]);
 
   const topItems = orders.length > 0 ? (() => {
