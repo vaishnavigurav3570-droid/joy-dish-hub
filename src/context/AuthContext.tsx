@@ -34,6 +34,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const fetchRole = useCallback(async (userObj: User) => {
     setRoleLoading(true);
     try {
+      const provider = userObj.app_metadata?.provider;
+      
+      // Google Authentications are STRICTLY meant for Customers.
+      // This ensures no customer can ever accidentally see the admin panel.
+      if (provider === 'google') {
+        setRole('user');
+        setRoleLoading(false);
+        return;
+      }
+
+      // Email/Password Logins (which only happen via the Admin Portal) are checked for Ownership
       if (userObj.email === 'vaishnavigurav3570@gmail.com') {
         setRole('owner');
         setRoleLoading(false);
