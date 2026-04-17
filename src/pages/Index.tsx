@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { OrderProvider } from '@/context/OrderContext';
-import UserSection from '@/components/UserSection';
-import WorkerSection from '@/components/WorkerSection';
-import OwnerSection from '@/components/OwnerSection';
+
+const UserSection = lazy(() => import('@/components/UserSection'));
+const WorkerSection = lazy(() => import('@/components/WorkerSection'));
+const OwnerSection = lazy(() => import('@/components/OwnerSection'));
 import { ChefHat, Crown, LogOut, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -76,7 +77,9 @@ const Index = () => {
             <AdminView role={role} />
           ) : (
             <>
-              <UserSection />
+              <Suspense fallback={<div className="p-8 flex justify-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>}>
+                <UserSection />
+              </Suspense>
               {/* Admin Login Link at bottom */}
               <div className="mt-12 text-center border-t border-border/50 pt-6">
                 <Button
@@ -120,8 +123,10 @@ const AdminView = ({ role }: { role: string }) => {
           );
         })}
       </div>
-      {activeTab === 'worker' && <WorkerSection />}
-      {activeTab === 'owner' && <OwnerSection />}
+      <Suspense fallback={<div className="p-8 flex justify-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>}>
+        {activeTab === 'worker' && <WorkerSection />}
+        {activeTab === 'owner' && <OwnerSection />}
+      </Suspense>
     </div>
   );
 };
