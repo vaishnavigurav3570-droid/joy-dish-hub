@@ -232,7 +232,11 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setOrders(prev => prev.map(o => o.id === orderNumber ? { ...o, status: status as any } : o));
     const dbId = dbOrderMap[orderNumber];
     if (dbId) {
-      await supabase.from('orders').update({ status }).eq('id', dbId);
+      const { error } = await supabase.from('orders').update({ status }).eq('id', dbId);
+      if (error) console.error('UPDATE order status failed:', error.message, error.code, error.details);
+      else console.log('UPDATE order status OK:', orderNumber, '->', status);
+    } else {
+      console.warn('No dbId found for order:', orderNumber, 'dbOrderMap:', dbOrderMap);
     }
   }, [dbOrderMap]);
 
@@ -272,7 +276,11 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, billSent: true, status: 'completed' } : o));
     const dbId = dbOrderMap[orderId];
     if (dbId) {
-      await supabase.from('orders').update({ bill_sent: true, status: 'completed' }).eq('id', dbId);
+      const { error } = await supabase.from('orders').update({ bill_sent: true, status: 'completed' }).eq('id', dbId);
+      if (error) console.error('UPDATE markBillSent failed:', error.message, error.code, error.details);
+      else console.log('UPDATE markBillSent OK:', orderId);
+    } else {
+      console.warn('No dbId found for markBillSent:', orderId);
     }
   }, [dbOrderMap]);
 

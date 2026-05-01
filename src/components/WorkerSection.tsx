@@ -1,22 +1,63 @@
+import { useState, useEffect } from 'react';
 import { useOrders } from '@/context/OrderContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Check, X, ChefHat, Clock, Flame } from 'lucide-react';
+import { Check, X, ChefHat, Clock, Flame, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import BlacklistBanner from './BlacklistBanner';
+import { supabase } from '@/integrations/supabase/client';
+
+const DISMISSED_KEY = 'kitchen_dismissed_orders';
+
+const getDismissedOrders = (): string[] => {
+  try {
+    return JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]');
+  } catch { return []; }
+};
 
 const WorkerSection = () => {
   const { orders, confirmOrder, rejectOrder, markReady } = useOrders();
+  const [dismissedIds, setDismissedIds] = useState<string[]>(getDismissedOrders);
 
-  const pendingOrders = orders.filter(o => o.status === 'pending');
-  const activeOrders = orders.filter(o => o.status === 'confirmed');
-  const readyOrders = orders.filter(o => o.status === 'ready');
+  // Sync to localStorage whenever dismissedIds changes
+  useEffect(() => {
+    localStorage.setItem(DISMISSED_KEY, JSON.stringify(dismissedIds));
+  }, [dismissedIds]);
+
+  // Filter out dismissed orders from all views
+  const visibleOrders = orders.filter(o => !dismissedIds.includes(o.id));
+
+  const pendingOrders = visibleOrders.filter(o => o.status === 'pending');
+  const activeOrders = visibleOrders.filter(o => o.status === 'confirmed');
+  const readyOrders = visibleOrders.filter(o => o.status === 'ready');
 
   const handleConfirm = (id: string) => { confirmOrder(id); toast.success('Order confirmed! 👨‍🍳'); };
-  const handleReject = (id: string) => { rejectOrder(id); toast.error('Order rejected'); };
+  const handleReject = (id: string) => {
+    rejectOrder(id);
+    setDismissedIds(prev => [...prev, id]);
+    toast.error('Order rejected');
+  };
   const handleReady = (id: string) => { markReady(id); toast.success('Order ready to serve! ✅'); };
+
+  const handleDone = async (id: string) => {
+    // Remove from kitchen view permanently
+    setDismissedIds(prev => [...prev, id]);
+    toast.success('Order removed from kitchen ✅');
+
+    // Also try to update DB status to completed (best effort)
+    try {
+      const { data } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('order_number', id)
+        .single();
+      if (data) {
+        await supabase.from('orders').update({ status: 'completed' }).eq('id', data.id);
+      }
+    } catch { /* silent - localStorage handles persistence */ }
+  };
 
   const OrderMeta = ({ order }: { order: typeof orders[0] }) => (
     <div>
@@ -158,10 +199,17 @@ const WorkerSection = () => {
             {readyOrders.map(order => (
               <motion.div key={order.id} layout>
                 <Card className="p-4 rounded-2xl border-l-4 border-l-accent bg-gradient-to-r from-accent/5 to-transparent">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between mb-3">
                     <OrderMeta order={order} />
                     <Badge className="gradient-cool text-accent-foreground rounded-full px-3 font-bold">₹{order.totalAmount}</Badge>
                   </div>
+                  <Button
+                    variant="outline"
+                    className="w-full rounded-xl font-semibold h-10 border-destructive/30 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all"
+                    onClick={() => handleDone(order.id)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" /> Remove from Kitchen
+                  </Button>
                 </Card>
               </motion.div>
             ))}
@@ -169,7 +217,7 @@ const WorkerSection = () => {
         </div>
       )}
 
-      {orders.length === 0 && (
+      {visibleOrders.length === 0 && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-20 text-muted-foreground">
           <ChefHat className="h-16 w-16 mx-auto mb-4 opacity-20" />
           <p className="text-lg font-medium">No orders yet</p>
