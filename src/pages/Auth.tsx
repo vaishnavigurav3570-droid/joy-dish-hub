@@ -20,10 +20,10 @@ const Auth = () => {
   const [isSignup, setIsSignup] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
 
-  // Redirect to home when logged in as admin (in useEffect, not during render)
+  // Redirect to admin dashboard when logged in as admin (in useEffect, not during render)
   useEffect(() => {
     if (!loading && !roleLoading && user && (role === 'worker' || role === 'owner')) {
-      navigate('/', { replace: true });
+      navigate('/admin/dashboard', { replace: true });
     }
   }, [user, role, loading, roleLoading, navigate]);
 
@@ -50,7 +50,7 @@ const Auth = () => {
         }
         toast.success('Account created! You are now logged in.');
         // Force reload to let AuthContext fetch the newly inserted role properly
-        window.location.href = '/';
+        window.location.href = '/admin/dashboard';
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -80,7 +80,7 @@ const Auth = () => {
         {/* Brand */}
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-extrabold tracking-tight" style={{ fontFamily: 'var(--text-display)' }}>
-            <span className="gradient-warm bg-clip-text text-transparent">The Curry</span>
+            <span className="text-gradient-warm">The Curry</span>
             <span className="text-foreground"> Corner</span>
           </h1>
           <p className="text-muted-foreground text-sm">Admin Login</p>
