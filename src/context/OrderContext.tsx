@@ -140,7 +140,6 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const { data } = await supabase
       .from('orders')
       .select('*, order_items(*, menu_items(*))')
-      .in('status', ['pending', 'confirmed', 'preparing', 'ready'])
       .order('created_at', { ascending: false });
 
     if (data) {
