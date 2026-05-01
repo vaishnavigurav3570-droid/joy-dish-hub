@@ -193,8 +193,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       .single();
 
     if (orderError || !orderData) {
-      console.error('Failed to create order:', orderError);
-      throw new Error('Failed to create order');
+      console.error('Failed to create order:', orderError?.message, orderError?.code, orderError?.details, orderError?.hint);
+      throw new Error(`Failed to create order: ${orderError?.message || 'Unknown error'}`);
     }
 
     const orderItems = items.map(i => ({

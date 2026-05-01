@@ -137,6 +137,7 @@ const UserSection = () => {
         toast.success(`Order ${result.orderNumber} placed! 🎉`);
       }
     } catch (err) {
+      console.error('Place order error:', err);
       toast.error('Failed to place order. Please try again.');
     } finally {
       setPlacing(false);
