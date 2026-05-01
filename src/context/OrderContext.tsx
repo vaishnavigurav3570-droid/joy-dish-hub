@@ -140,6 +140,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const { data } = await supabase
       .from('orders')
       .select('*, order_items(*, menu_items(*))')
+      .in('status', ['pending', 'confirmed', 'preparing', 'ready'])
       .order('created_at', { ascending: false });
 
     if (data) {
@@ -268,10 +269,10 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [dbOrderMap]);
 
   const markBillSent = useCallback(async (orderId: string) => {
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, billSent: true } : o));
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, billSent: true, status: 'completed' } : o));
     const dbId = dbOrderMap[orderId];
     if (dbId) {
-      await supabase.from('orders').update({ bill_sent: true }).eq('id', dbId);
+      await supabase.from('orders').update({ bill_sent: true, status: 'completed' }).eq('id', dbId);
     }
   }, [dbOrderMap]);
 

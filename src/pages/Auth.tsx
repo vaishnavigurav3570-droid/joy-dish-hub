@@ -20,10 +20,18 @@ const Auth = () => {
   const [isSignup, setIsSignup] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
 
-  // Redirect to admin dashboard when logged in as admin (in useEffect, not during render)
+  // Redirect to admin dashboard when logged in as admin
+  // Sign out non-admin users so they can enter admin credentials
   useEffect(() => {
-    if (!loading && !roleLoading && user && (role === 'worker' || role === 'owner')) {
-      navigate('/admin/dashboard', { replace: true });
+    if (!loading && !roleLoading && user) {
+      if (role === 'worker' || role === 'owner') {
+        navigate('/admin/dashboard', { replace: true });
+      } else {
+        // Customer (Google user) trying to access admin — sign them out first
+        supabase.auth.signOut().then(() => {
+          toast.info('Please sign in with admin credentials');
+        });
+      }
     }
   }, [user, role, loading, roleLoading, navigate]);
 
