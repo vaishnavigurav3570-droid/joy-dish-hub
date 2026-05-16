@@ -15,7 +15,7 @@ const BlacklistBanner: React.FC<BlacklistBannerProps> = ({ order, allOrders }) =
 
   if (noShowOrders.length === 0) return null;
 
-  const lastNoShow = noShowOrders[0];
+  const totalLoss = noShowOrders.reduce((sum, o) => sum + o.totalAmount, 0);
 
   return (
     <motion.div
@@ -24,10 +24,10 @@ const BlacklistBanner: React.FC<BlacklistBannerProps> = ({ order, allOrders }) =
       className="rounded-xl border-2 border-destructive bg-destructive/10 p-3 mb-3"
     >
       <p className="text-destructive font-extrabold text-sm flex items-center gap-1.5">
-        🚨 BLACKLISTED CUSTOMER — Previous No-Show
+        🚨 BLACKLISTED CUSTOMER — {noShowOrders.length} Previous No-Show{noShowOrders.length > 1 ? 's' : ''}
       </p>
       <p className="text-destructive/80 text-xs mt-1">
-        Unpaid amount: <span className="font-bold">₹{lastNoShow.totalAmount}</span>
+        Total unpaid: <span className="font-bold">₹{totalLoss.toLocaleString()}</span>
       </p>
     </motion.div>
   );

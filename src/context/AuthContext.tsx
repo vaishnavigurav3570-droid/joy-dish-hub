@@ -45,7 +45,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // Email/Password Logins (which only happen via the Admin Portal) are checked for Ownership
-      if (userObj.email === 'vaishnavigurav3570@gmail.com') {
+      const ownerEmail = import.meta.env.VITE_OWNER_EMAIL;
+      if (ownerEmail && userObj.email === ownerEmail) {
         setRole('owner');
         setRoleLoading(false);
         return;

@@ -57,7 +57,7 @@ export function generateBillText(
 ${sep}
 
   Order:    ${orderNumber}
-  Table:    ${tableNumber}
+  ${tableNumber === 0 ? 'Type:     Pre-order Pickup' : `Table:    ${tableNumber}`}
   Customer: ${customerName}
   Phone:    ${phone}
   Date:     ${date.toLocaleDateString('en-IN')}

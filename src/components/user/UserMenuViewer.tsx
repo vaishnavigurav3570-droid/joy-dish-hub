@@ -43,7 +43,10 @@ export function UserMenuViewer({ categories, activeCategory, setActiveCategory, 
                       <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" onError={(e) => {
                         const target = e.target as HTMLImageElement;
                         target.style.display = 'none';
-                        target.parentElement!.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-secondary text-5xl">${item.emoji}</div>`;
+                        const fallback = document.createElement('div');
+                        fallback.className = 'w-full h-full flex items-center justify-center bg-secondary text-5xl';
+                        fallback.textContent = item.emoji;
+                        target.parentElement!.appendChild(fallback);
                       }} />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-secondary text-5xl">{item.emoji}</div>

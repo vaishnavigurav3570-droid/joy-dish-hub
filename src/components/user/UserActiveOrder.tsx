@@ -64,13 +64,17 @@ export function UserActiveOrder({ activeOrder, successPin, isOrderConfirmed, can
                   activeOrder.status === 'confirmed' ? 'gradient-warm text-primary-foreground' :
                   activeOrder.status === 'ready' ? 'gradient-cool text-accent-foreground' :
                   activeOrder.status === 'rejected' ? 'bg-destructive/15 text-destructive' :
-                  activeOrder.status === 'cancelled' ? 'bg-muted text-muted-foreground' : ''
+                  activeOrder.status === 'cancelled' ? 'bg-muted text-muted-foreground' :
+                  activeOrder.status === 'completed' ? 'gradient-cool text-accent-foreground' :
+                  activeOrder.status === 'no_show' ? 'bg-destructive/15 text-destructive' : ''
                 }`}>
                   {activeOrder.status === 'pending' && '⏳ Waiting for Kitchen'}
                   {activeOrder.status === 'confirmed' && '👨‍🍳 Being Prepared'}
                   {activeOrder.status === 'ready' && '✅ Ready for Pickup!'}
                   {activeOrder.status === 'rejected' && '❌ Rejected'}
                   {activeOrder.status === 'cancelled' && '🚫 Cancelled'}
+                  {activeOrder.status === 'completed' && '✅ Completed'}
+                  {activeOrder.status === 'no_show' && '⚠️ Marked No-Show'}
                 </Badge>
               </motion.div>
             </div>
@@ -91,10 +95,14 @@ export function UserActiveOrder({ activeOrder, successPin, isOrderConfirmed, can
                   variant="outline"
                   size="sm"
                   className="rounded-xl text-destructive border-destructive/30 hover:bg-destructive/10 gap-1.5"
-                  onClick={() => {
-                    cancelOrder(activeOrder.id);
-                    setActiveOrderId(null);
-                    toast.success('Order cancelled successfully');
+                  onClick={async () => {
+                    try {
+                      await cancelOrder(activeOrder.id);
+                      setActiveOrderId(null);
+                      toast.success('Order cancelled successfully');
+                    } catch {
+                      toast.error('Failed to cancel order. Please try again.');
+                    }
                   }}
                 >
                   <X className="h-3.5 w-3.5" /> Cancel Order

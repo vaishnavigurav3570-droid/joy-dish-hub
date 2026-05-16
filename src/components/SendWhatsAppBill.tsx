@@ -55,9 +55,13 @@ const SendWhatsAppBill: React.FC<SendWhatsAppBillProps> = ({ order, onBillSent }
       const fullPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
       const waUrl = `https://wa.me/${fullPhone}?text=${encodeURIComponent(message)}`;
 
-      window.open(waUrl, '_blank');
-      onBillSent?.();
-      toast.success(publicUrl ? 'Bill sent via WhatsApp!' : 'Bill message sent (image upload unavailable)');
+      const win = window.open(waUrl, '_blank');
+      if (win) {
+        onBillSent?.();
+        toast.success(publicUrl ? 'Bill sent via WhatsApp!' : 'Bill message sent (image upload unavailable)');
+      } else {
+        toast.error('Popup blocked! Please allow popups to send WhatsApp bills.');
+      }
     } catch (err: unknown) {
       console.error('WhatsApp bill error:', err);
       toast.error((err as Error).message || 'Failed to send bill');

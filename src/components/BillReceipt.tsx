@@ -41,7 +41,7 @@ const BillReceipt = forwardRef<HTMLDivElement, BillReceiptProps>(({ order }, ref
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#57534e', marginBottom: 12 }}>
         <div>
           <p style={{ margin: 0 }}><strong>Order:</strong> {order.id}</p>
-          <p style={{ margin: '2px 0 0' }}><strong>Table:</strong> {order.tableNumber}</p>
+          <p style={{ margin: '2px 0 0' }}><strong>{order.orderType === 'preorder' ? 'Type:' : 'Table:'}</strong> {order.orderType === 'preorder' ? 'Pre-order Pickup' : order.tableNumber}</p>
         </div>
         <div style={{ textAlign: 'right' }}>
           <p style={{ margin: 0 }}><strong>Customer:</strong> {order.customerName}</p>

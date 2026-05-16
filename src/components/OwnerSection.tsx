@@ -29,7 +29,7 @@ import { exportPDFReport, exportCSV, exportArchivePDF } from "@/lib/exportUtils"
 import { startOfDay, isToday, format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 
 const OwnerSection = () => {
-  const { orders, menu, toggleMenuAvailability, markBillSent, markNoShow, updateMenuItemAR, salesData, topItems } = useOrders();
+  const { orders, menu, toggleMenuAvailability, markBillSent, markNoShow, updateMenuItemAR, refreshOrders, salesData, topItems } = useOrders();
   const [ownerTab, setOwnerTab] = useState('orders');
   const [previewOrder, setPreviewOrder] = useState<Order | null>(null);
   const [uploadingAR, setUploadingAR] = useState<string | null>(null);
@@ -63,13 +63,13 @@ const OwnerSection = () => {
 
   // ── Computed stats (TODAY only for top cards) ──
   const todayStats = useMemo(() => {
-    const live = todayOrders.filter(o => o.status !== 'rejected' && o.status !== 'no_show');
+    const live = todayOrders.filter(o => o.status !== 'rejected' && o.status !== 'cancelled' && o.status !== 'no_show');
     const totalRevenue = live.reduce((s, o) => s + o.totalAmount, 0);
     const totalOrders = todayOrders.length;
     const noShowOrders = todayOrders.filter(o => o.status === 'no_show');
     const noShowCount = noShowOrders.length;
     const noShowLoss = noShowOrders.reduce((s, o) => s + o.totalAmount, 0);
-    const avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / (totalOrders - noShowCount || 1)) : 0;
+    const avgOrderValue = live.length > 0 ? Math.round(totalRevenue / live.length) : 0;
     const uniqueCustomers = new Set(todayOrders.map(o => o.userPhone)).size;
     const billsSent = todayOrders.filter(o => o.billSent).length;
     return { totalRevenue, totalOrders, noShowCount, noShowLoss, avgOrderValue, uniqueCustomers, billsSent };
@@ -77,7 +77,7 @@ const OwnerSection = () => {
 
   // ── All-time stats for pipeline & analytics ──
   const stats = useMemo(() => {
-    const liveOrders = orders.filter(o => o.status !== 'rejected' && o.status !== 'no_show');
+    const liveOrders = orders.filter(o => o.status !== 'rejected' && o.status !== 'cancelled' && o.status !== 'no_show');
     const totalRevenue = liveOrders.reduce((s, o) => s + o.totalAmount, 0);
     const totalOrders = orders.length;
     const pendingCount = orders.filter(o => o.status === 'pending').length;
@@ -86,16 +86,16 @@ const OwnerSection = () => {
     const noShowOrders = orders.filter(o => o.status === 'no_show');
     const noShowCount = noShowOrders.length;
     const noShowLoss = noShowOrders.reduce((s, o) => s + o.totalAmount, 0);
-    const dineInOrders = orders.filter(o => o.orderType === 'dine-in' && o.status !== 'rejected');
-    const preOrders = orders.filter(o => o.orderType === 'preorder' && o.status !== 'rejected');
+    const dineInOrders = orders.filter(o => o.orderType === 'dine-in' && o.status !== 'rejected' && o.status !== 'cancelled' && o.status !== 'no_show');
+    const preOrders = orders.filter(o => o.orderType === 'preorder' && o.status !== 'rejected' && o.status !== 'cancelled' && o.status !== 'no_show');
     const dineInRevenue = dineInOrders.reduce((s, o) => s + o.totalAmount, 0);
     const preOrderRevenue = preOrders.reduce((s, o) => s + o.totalAmount, 0);
-    const avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / (totalOrders - noShowCount || 1)) : 0;
+    const avgOrderValue = liveOrders.length > 0 ? Math.round(totalRevenue / liveOrders.length) : 0;
     const uniqueCustomers = new Set(orders.map(o => o.userPhone)).size;
     const billsSent = orders.filter(o => o.billSent).length;
 
     const counts: Record<string, { count: number; revenue: number; emoji: string }> = {};
-    orders.filter(o => o.status !== 'rejected').forEach(o => {
+    orders.filter(o => o.status !== 'rejected' && o.status !== 'cancelled' && o.status !== 'no_show').forEach(o => {
       [...o.items, ...o.additionalRequests].forEach(i => {
         if (!counts[i.menuItem.name]) counts[i.menuItem.name] = { count: 0, revenue: 0, emoji: i.menuItem.emoji };
         counts[i.menuItem.name].count += i.quantity;
@@ -191,7 +191,8 @@ const OwnerSection = () => {
 
       toast.success(`Deleted ${archiveOrders.length} orders from ${archiveLabel}`);
       setDeleteConfirmStep(0);
-      // Force refresh via realtime
+      // Refresh local state to reflect the deletion immediately
+      await refreshOrders();
     } catch (err: unknown) {
       toast.error((err as Error).message || 'Failed to delete data');
     } finally {

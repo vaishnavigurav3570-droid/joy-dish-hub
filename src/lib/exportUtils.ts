@@ -18,12 +18,15 @@ export const exportPDFReport = async (reportRef: React.RefObject<HTMLDivElement>
 
 export const exportCSV = (archiveOrders: Order[], archiveLabel: string) => {
   if (archiveOrders.length === 0) throw new Error('No orders for this month');
-  const headers = ['Name', 'Phone Number', 'Order ID', 'Amount', 'Date'];
+  const headers = ['Name', 'Phone Number', 'Order ID', 'Amount', 'Status', 'Order Type', 'Items', 'Date'];
   const rows = archiveOrders.map((o: Order) => [
     o.customerName || 'Unknown',
     o.userPhone,
     o.id,
     o.totalAmount.toString(),
+    o.status,
+    o.orderType,
+    [...o.items, ...o.additionalRequests].map(i => `${i.menuItem.name} x${i.quantity}`).join('; '),
     format(o.createdAt, 'yyyy-MM-dd HH:mm'),
   ]);
   const csvContent = [headers, ...rows].map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -38,10 +41,10 @@ export const exportCSV = (archiveOrders: Order[], archiveLabel: string) => {
 
 export const exportArchivePDF = (archiveOrders: Order[], archiveLabel: string) => {
   if (archiveOrders.length === 0) throw new Error('No orders for this month');
-  const totalRev = archiveOrders.filter((o: Order) => o.status !== 'rejected' && o.status !== 'no_show').reduce((s: number, o: Order) => s + o.totalAmount, 0);
+  const totalRev = archiveOrders.filter((o: Order) => o.status !== 'rejected' && o.status !== 'cancelled' && o.status !== 'no_show').reduce((s: number, o: Order) => s + o.totalAmount, 0);
   const noShowLoss = archiveOrders.filter((o: Order) => o.status === 'no_show').reduce((s: number, o: Order) => s + o.totalAmount, 0);
   const counts: Record<string, number> = {};
-  archiveOrders.filter((o: Order) => o.status !== 'rejected').forEach((o: Order) => {
+  archiveOrders.filter((o: Order) => o.status !== 'rejected' && o.status !== 'cancelled' && o.status !== 'no_show').forEach((o: Order) => {
     [...o.items, ...o.additionalRequests].forEach(i => {
       counts[i.menuItem.name] = (counts[i.menuItem.name] || 0) + i.quantity;
     });

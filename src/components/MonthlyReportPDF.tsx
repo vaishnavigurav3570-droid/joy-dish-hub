@@ -16,9 +16,9 @@ const MonthlyReportPDF = forwardRef<HTMLDivElement, MonthlyReportPDFProps>(({ or
   const noShowOrders = orders.filter(o => o.status === 'no_show');
   const noShowRevenue = noShowOrders.reduce((sum, o) => sum + o.totalAmount, 0);
 
-  // Top 5 items
+  // Top 5 items (only from revenue-generating orders)
   const counts: Record<string, number> = {};
-  orders.forEach(o => {
+  liveOrders.forEach(o => {
     [...o.items, ...o.additionalRequests].forEach(i => {
       counts[i.menuItem.name] = (counts[i.menuItem.name] || 0) + i.quantity;
     });

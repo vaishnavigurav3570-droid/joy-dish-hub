@@ -29,7 +29,9 @@ export default function OwnerCustomers({ orders, stats }: OwnerCustomersProps) {
                   customerMap[key] = { name: o.customerName || '', phone: o.userPhone, orders: 0, totalSpent: 0, noShows: 0, lastOrder: o.createdAt };
                 }
                 customerMap[key].orders++;
-                customerMap[key].totalSpent += o.totalAmount;
+                if (o.status !== 'rejected' && o.status !== 'cancelled' && o.status !== 'no_show') {
+                  customerMap[key].totalSpent += o.totalAmount;
+                }
                 if (o.status === 'no_show') customerMap[key].noShows++;
                 if (o.createdAt > customerMap[key].lastOrder) {
                   customerMap[key].lastOrder = o.createdAt;

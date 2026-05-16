@@ -72,7 +72,7 @@ const AdminDashboard = () => {
                 variant="ghost"
                 size="icon"
                 className="h-9 w-9 rounded-xl text-muted-foreground hover:text-destructive"
-                onClick={() => { signOut(); setGuestMode(true); navigate('/'); }}
+                onClick={async () => { await signOut(); setGuestMode(true); navigate('/'); }}
                 title="Sign out"
               >
                 <LogOut className="h-4 w-4" />

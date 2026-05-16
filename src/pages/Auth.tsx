@@ -5,19 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { ChefHat, Crown, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-
-type RoleTab = 'worker' | 'owner';
 
 const Auth = () => {
   const { user, role, loading, roleLoading } = useAuth();
   const navigate = useNavigate();
-  const [roleTab, setRoleTab] = useState<RoleTab>('worker');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [isSignup, setIsSignup] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
@@ -34,8 +30,6 @@ const Auth = () => {
         setSigningOut(true);
         supabase.auth.signOut().then(() => {
           toast.info('Please sign in with admin credentials');
-          // signOut triggers onAuthStateChange which clears user in context.
-          // setSigningOut(false) will happen on the next render when user becomes null.
         });
       }
     } else {
@@ -51,40 +45,15 @@ const Auth = () => {
     }
     setAuthLoading(true);
     try {
-      if (isSignup) {
-        const { data: signUpData, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { data: { display_name: email.split('@')[0], role: roleTab } },
-        });
-        if (error) throw error;
-        const newUser = signUpData?.user;
-        if (newUser) {
-          await new Promise(r => setTimeout(r, 500));
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { error: roleError } = await (supabase as any).from('user_roles').insert({ user_id: newUser.id, role: roleTab });
-          if (roleError) console.error('Role assignment error:', roleError);
-        }
-        toast.success('Account created! You are now logged in.');
-        // Force reload to let AuthContext fetch the newly inserted role properly
-        window.location.href = '/admin/dashboard';
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        toast.success('Welcome back!');
-        // We do NOT navigate here manually. We let the useEffect handle it once AuthContext loads fully!
-      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      toast.success('Welcome back!');
     } catch (err: unknown) {
       toast.error((err as Error).message || 'Authentication failed');
     } finally {
       setAuthLoading(false);
     }
   };
-
-  const roles = [
-    { id: 'worker' as RoleTab, label: 'Kitchen Staff', icon: ChefHat, desc: 'Manage & prepare orders' },
-    { id: 'owner' as RoleTab, label: 'Owner / Admin', icon: Crown, desc: 'Full restaurant control' },
-  ];
 
   // While loading auth state or signing out a Google user, show spinner
   if (loading || roleLoading || signingOut) {
@@ -117,32 +86,10 @@ const Auth = () => {
           <p className="text-muted-foreground text-sm">Admin Login</p>
         </div>
 
-        {/* Role Selection */}
-        <div className="grid grid-cols-2 gap-3">
-          {roles.map(role => {
-            const Icon = role.icon;
-            return (
-              <button
-                key={role.id}
-                onClick={() => setRoleTab(role.id)}
-                className={`p-4 rounded-2xl border-2 transition-all duration-300 text-left ${
-                  roleTab === role.id
-                    ? 'border-primary bg-primary/5 shadow-lg shadow-primary/10'
-                    : 'border-border hover:border-primary/30 bg-card'
-                }`}
-              >
-                <Icon className={`h-6 w-6 mb-2 ${roleTab === role.id ? 'text-primary' : 'text-muted-foreground'}`} />
-                <p className="font-bold text-foreground text-sm">{role.label}</p>
-                <p className="text-muted-foreground text-xs mt-0.5">{role.desc}</p>
-              </button>
-            );
-          })}
-        </div>
-
         {/* Login Form */}
         <Card className="p-6 rounded-2xl space-y-4">
           <h2 className="font-bold text-foreground text-lg">
-            {isSignup ? 'Create Account' : 'Sign In'} as {roleTab === 'worker' ? 'Kitchen Staff' : 'Owner'}
+            Staff Sign In
           </h2>
 
           <Input className="rounded-xl h-12" placeholder="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} />
@@ -170,15 +117,8 @@ const Auth = () => {
             onClick={handleAuth}
             disabled={authLoading}
           >
-            {authLoading ? 'Please wait...' : isSignup ? 'Create Account' : 'Sign In'}
+            {authLoading ? 'Please wait...' : 'Sign In'}
           </Button>
-
-          <p className="text-center text-sm text-muted-foreground">
-            {isSignup ? 'Already have an account?' : "Don't have an account?"}{' '}
-            <button className="text-primary font-semibold hover:underline" onClick={() => setIsSignup(!isSignup)}>
-              {isSignup ? 'Sign In' : 'Sign Up'}
-            </button>
-          </p>
         </Card>
       </div>
     </div>

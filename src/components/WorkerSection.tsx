@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useOrders } from '@/context/OrderContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,7 +23,7 @@ const getDismissedOrders = (): string[] => {
 const WorkerSection = () => {
   const { orders, confirmOrder, rejectOrder, markReady } = useOrders();
   const [dismissedIds, setDismissedIds] = useState<string[]>(getDismissedOrders);
-  const dismissedSet = new Set(dismissedIds);
+  const dismissedSet = useMemo(() => new Set(dismissedIds), [dismissedIds]);
 
   // Sync to localStorage whenever dismissedIds changes
   useEffect(() => {

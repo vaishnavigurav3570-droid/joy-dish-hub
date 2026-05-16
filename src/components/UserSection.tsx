@@ -27,7 +27,9 @@ const UserSection = () => {
   const [phone, setPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [phoneError, setPhoneError] = useState('');
-  const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(
+    () => localStorage.getItem('activeOrderId')
+  );
   const [showCart, setShowCart] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -36,6 +38,46 @@ const UserSection = () => {
   const [successOrderId, setSuccessOrderId] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
   const [arModel, setArModel] = useState<{ url: string; name: string } | null>(null);
+
+  // Persist activeOrderId to localStorage
+  useEffect(() => {
+    if (activeOrderId) localStorage.setItem('activeOrderId', activeOrderId);
+    else localStorage.removeItem('activeOrderId');
+  }, [activeOrderId]);
+
+  // Recover active order from DB on page refresh
+  useEffect(() => {
+    if (!activeOrderId) return;
+    const existsLocally = orders.find(o => o.id === activeOrderId);
+    if (existsLocally) {
+      // Auto-clear if terminal
+      if (['completed', 'rejected', 'cancelled', 'no_show'].includes(existsLocally.status)) {
+        setActiveOrderId(null);
+      }
+      return;
+    }
+
+    // Order ID in localStorage but no data — try recovering from DB
+    const recover = async () => {
+      try {
+        const { data } = await supabase
+          .from('orders')
+          .select('status')
+          .eq('order_number', activeOrderId)
+          .single();
+        if (!data || ['completed', 'rejected', 'cancelled', 'no_show'].includes(data.status)) {
+          // Order doesn't exist or is done — clear stale ID
+          setActiveOrderId(null);
+        }
+        // If order is still active (pending/confirmed/ready), the customer
+        // won't see live tracking without admin-level realtime, but the
+        // activeOrderId stays valid so "Request More Items" still works.
+      } catch {
+        setActiveOrderId(null);
+      }
+    };
+    recover();
+  }, [activeOrderId, orders]);
 
   // Auto-fill from authenticated user session (Google metadata)
   useEffect(() => {
@@ -55,7 +97,7 @@ const UserSection = () => {
   const categories = [...new Set(availableMenu.map(i => i.category))];
 
   const activeOrder = orders.find(o => o.id === activeOrderId);
-  const isOrderConfirmed = activeOrder && (activeOrder.status === 'confirmed' || activeOrder.status === 'preparing' || activeOrder.status === 'ready');
+  const isOrderConfirmed = activeOrder && activeOrder.status === 'confirmed';
   const canCancelOrder = activeOrder && activeOrder.status === 'pending';
 
   useEffect(() => {
@@ -117,6 +159,13 @@ const UserSection = () => {
     if (!valid) { setPhoneError(error || 'Invalid phone'); toast.error(error || 'Invalid phone number'); return; }
     if (cart.length === 0) { toast.error('Add items to your cart first'); return; }
 
+    // Validate table number before starting the order
+    const tbl = orderType === 'preorder' ? 0 : parseInt(tableNumber);
+    if (orderType === 'dine-in' && (!Number.isFinite(tbl) || tbl < 1)) {
+      toast.error('Please enter a valid table number (1 or higher)');
+      return;
+    }
+
     // Save WhatsApp number to localStorage for auto-fill
     if (user) {
       localStorage.setItem(`wa_phone_${user.id}`, phone);
@@ -124,7 +173,6 @@ const UserSection = () => {
 
     setPlacing(true);
     try {
-      const tbl = orderType === 'preorder' ? 0 : parseInt(tableNumber);
       const result = await placeOrder(cart, tbl, cleaned, customerName.trim(), orderType);
       setActiveOrderId(result.orderNumber);
       setCart([]);
@@ -155,19 +203,26 @@ const UserSection = () => {
   const handleRequestMore = async () => {
     if (cart.length === 0) { toast.error('Add items first'); return; }
     if (activeOrderId) {
-      await addMoreItems(activeOrderId, cart);
-      setCart([]);
-      setShowCart(false);
-      toast.success('Additional items requested! 🍽️');
+      try {
+        await addMoreItems(activeOrderId, cart);
+        setCart([]);
+        setShowCart(false);
+        toast.success('Additional items requested! 🍽️');
+      } catch (err) {
+        toast.error((err as Error).message || 'Failed to add items');
+      }
     }
   };
 
   const getCartQty = (id: string) => cart.find(c => c.menuItem.id === id)?.quantity || 0;
 
-  const copyPin = () => {
-    if (successPin) {
-      navigator.clipboard.writeText(successPin);
+  const copyPin = async () => {
+    if (!successPin) return;
+    try {
+      await navigator.clipboard.writeText(successPin);
       toast.success('PIN copied!');
+    } catch {
+      toast.error('Copy failed — please note your PIN manually');
     }
   };
 
