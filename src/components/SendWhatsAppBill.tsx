@@ -33,14 +33,14 @@ const SendWhatsAppBill: React.FC<SendWhatsAppBillProps> = ({ order, onBillSent }
 
       let publicUrl = '';
       try {
-        const fileName = `bill-${order.id}-${Date.now()}.png`;
+        const fileName = `bill-${order.id}.png`;
         const { error: uploadError } = await supabase.storage
           .from('bills')
           .upload(fileName, blob, { contentType: 'image/png', upsert: true });
 
         if (!uploadError) {
           const { data: urlData } = supabase.storage.from('bills').getPublicUrl(fileName);
-          publicUrl = urlData.publicUrl;
+          publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
         } else {
           console.warn('Bill storage upload failed (RLS or bucket missing), sending text-only:', uploadError.message);
         }

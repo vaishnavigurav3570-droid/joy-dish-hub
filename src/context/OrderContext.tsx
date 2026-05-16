@@ -47,6 +47,8 @@ interface OrderContextType {
   refreshOrders: () => Promise<void>;
   salesData: typeof MOCK_SALES;
   topItems: { name: string; count: number }[];
+  isRestaurantOpen: boolean;
+  toggleRestaurantStatus: () => Promise<void>;
 }
 
 const OrderContext = createContext<OrderContextType | null>(null);
@@ -118,8 +120,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const queryClient = useQueryClient();
   const [orders, setOrders] = useState<Order[]>([]);
   const [dbOrderMap, setDbOrderMap] = useState<Record<string, string>>({});
-  // Ref always holds the latest dbOrderMap so callbacks never use stale closures
   const dbOrderMapRef = useRef<Record<string, string>>({});
+  const [isRestaurantOpen, setIsRestaurantOpen] = useState(true);
 
   const isAdmin = user && (role === 'worker' || role === 'owner');
 
@@ -175,6 +177,35 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, [isAdmin, fetchOrders]);
 
+  // ── Shop Status Settings ──
+  const fetchSettings = useCallback(async () => {
+    const { data, error } = await (supabase as any).from('app_settings').select('is_open').eq('id', 1).single();
+    if (!error && data) setIsRestaurantOpen(Boolean(data.is_open));
+  }, []);
+
+  useEffect(() => {
+    fetchSettings();
+    const channel = supabase
+      .channel('settings-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, payload => {
+        const row = payload.new as any;
+        if (row && 'is_open' in row) setIsRestaurantOpen(Boolean(row.is_open));
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchSettings]);
+
+  const toggleRestaurantStatus = useCallback(async () => {
+    const newState = !isRestaurantOpen;
+    setIsRestaurantOpen(newState); // Optimistic UI
+    const { error } = await (supabase as any).from('app_settings').update({ is_open: newState }).eq('id', 1);
+    if (error) {
+      setIsRestaurantOpen(!newState); // Rollback
+      console.error('Failed to update shop status:', error.message);
+      throw new Error('Failed to update shop status');
+    }
+  }, [isRestaurantOpen]);
+
   const toggleMenuAvailability = useCallback(async (id: string) => {
     const item = menu.find(m => m.id === id);
     if (!item) return;
@@ -190,6 +221,9 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const placeOrder = useCallback(async (
     items: CartItem[], tableNumber: number, phone: string, customerName: string, orderType: OrderType
   ): Promise<{ orderNumber: string; pickupPin: string | null }> => {
+    // Defense-in-depth: reject orders when shop is closed
+    if (!isRestaurantOpen) throw new Error('The shop is currently closed. Please try again later.');
+
     const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}`;
     const totalAmount = items.reduce((sum, i) => sum + i.menuItem.price * i.quantity, 0);
     const pickupPin = orderType === 'preorder' ? generatePickupPin() : null;
@@ -251,7 +285,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     dbOrderMapRef.current = newMap;
 
     return { orderNumber, pickupPin };
-  }, [user]);
+  }, [user, isRestaurantOpen]);
 
   const updateOrderStatus = useCallback(async (orderNumber: string, status: string) => {
     const prevOrders = orders;
@@ -277,6 +311,9 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const cancelOrder = useCallback((id: string) => updateOrderStatus(id, 'cancelled'), [updateOrderStatus]);
 
   const addMoreItems = useCallback(async (orderId: string, items: CartItem[]) => {
+    // Defense-in-depth: reject when shop is closed
+    if (!isRestaurantOpen) throw new Error('The shop is currently closed.');
+
     const additionalTotal = items.reduce((sum, i) => sum + i.menuItem.price * i.quantity, 0);
 
     // Compute newTotal from current state synchronously before any async work
@@ -316,25 +353,41 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         throw new Error('Failed to add items. Please try again.');
       }
       if (newTotal > 0) {
-        await supabase.from('orders').update({ total_amount: newTotal }).eq('id', dbId);
+        const { error: updateError } = await supabase.from('orders').update({ total_amount: newTotal }).eq('id', dbId);
+        if (updateError) {
+          console.error('Failed to update total amount:', updateError.message);
+          // Rollback local state
+          const rollbackCount = items.length;
+          setOrders(prev => prev.map(o => {
+            if (o.id !== orderId) return o;
+            return {
+              ...o,
+              additionalRequests: o.additionalRequests.slice(0, -rollbackCount),
+              totalAmount: o.totalAmount - additionalTotal,
+            };
+          }));
+          throw new Error('Failed to update order total. Please try again.');
+        }
       }
     }
-  }, []);
+  }, [isRestaurantOpen]);
 
   const markBillSent = useCallback(async (orderId: string) => {
+    const prevOrder = orders.find(o => o.id === orderId);
+    const prevStatus = prevOrder?.status || 'ready';
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, billSent: true, status: 'completed' } : o));
     const dbId = dbOrderMapRef.current[orderId];
     if (dbId) {
       const { error } = await supabase.from('orders').update({ bill_sent: true, status: 'completed' }).eq('id', dbId);
       if (error) {
         console.error('UPDATE markBillSent failed:', error.message, error.code, error.details);
-        // Rollback optimistic update
-        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, billSent: false, status: 'ready' } : o));
+        // Rollback to actual previous status
+        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, billSent: false, status: prevStatus } : o));
       }
     } else {
       console.warn('No dbId found for markBillSent:', orderId);
     }
-  }, []);
+  }, [orders]);
 
   const updateMenuItemAR = useCallback(async (menuItemId: string, arModelUrl: string) => {
     queryClient.setQueryData(['menu'], (prev: any) => prev?.map((m: any) => m.id === menuItemId ? { ...m, ar_model_url: arModelUrl } : m) || []);
@@ -363,6 +416,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       rejectOrder, markReady, markNoShow, cancelOrder, addMoreItems, markBillSent, updateMenuItemAR,
       refreshOrders: fetchOrders,
       salesData: MOCK_SALES, topItems,
+      isRestaurantOpen, toggleRestaurantStatus,
     }}>
       {children}
     </OrderContext.Provider>

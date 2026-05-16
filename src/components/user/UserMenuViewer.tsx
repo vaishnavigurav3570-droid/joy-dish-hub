@@ -33,7 +33,7 @@ export function UserMenuViewer({ categories, activeCategory, setActiveCategory, 
         <motion.div key={activeCategory} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }} className="grid grid-cols-2 gap-4">
           {availableMenu.filter((i: MenuItem) => i.category === activeCategory).map((item: MenuItem, idx: number) => {
             const qty = getCartQty(item.id);
-            const arUrl = (item as unknown as { ar_model_url?: string }).ar_model_url;
+            const arUrl = item.ar_model_url;
             const hasAR = !!arUrl;
             return (
               <motion.div key={item.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}>
@@ -43,14 +43,12 @@ export function UserMenuViewer({ categories, activeCategory, setActiveCategory, 
                       <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" onError={(e) => {
                         const target = e.target as HTMLImageElement;
                         target.style.display = 'none';
-                        const fallback = document.createElement('div');
-                        fallback.className = 'w-full h-full flex items-center justify-center bg-secondary text-5xl';
-                        fallback.textContent = item.emoji;
-                        target.parentElement!.appendChild(fallback);
+                        // Show the sibling emoji fallback
+                        const fallback = target.nextElementSibling as HTMLElement;
+                        if (fallback) fallback.style.display = 'flex';
                       }} />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-secondary text-5xl">{item.emoji}</div>
-                    )}
+                    ) : null}
+                    <div className="w-full h-full flex items-center justify-center bg-secondary text-5xl" style={{ display: item.image ? 'none' : 'flex' }}>{item.emoji}</div>
                     <AnimatePresence>
                       {qty > 0 && (
                         <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} className="absolute top-2 right-2 gradient-warm text-primary-foreground text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shadow-lg">

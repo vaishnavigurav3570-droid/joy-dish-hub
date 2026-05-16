@@ -89,7 +89,7 @@ export default function OwnerAnalytics({ orders, menu, stats, handleExportPDF, e
       <div className="grid grid-cols-2 gap-3">
         <Card className="p-4 rounded-2xl text-center">
           <Percent className="h-4 w-4 text-accent mx-auto mb-1" />
-          <p className="text-lg font-black text-foreground">{stats.totalOrders > 0 ? Math.round((stats.billsSent / stats.totalOrders) * 100) : 0}%</p>
+          <p className="text-lg font-black text-foreground">{stats.liveOrders.length > 0 ? Math.round((stats.billsSent / stats.liveOrders.length) * 100) : 0}%</p>
           <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Bills Sent</p>
         </Card>
         <Card className="p-4 rounded-2xl text-center">

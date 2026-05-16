@@ -29,7 +29,7 @@ import { exportPDFReport, exportCSV, exportArchivePDF } from "@/lib/exportUtils"
 import { startOfDay, isToday, format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 
 const OwnerSection = () => {
-  const { orders, menu, toggleMenuAvailability, markBillSent, markNoShow, updateMenuItemAR, refreshOrders, salesData, topItems } = useOrders();
+  const { orders, menu, toggleMenuAvailability, markBillSent, markNoShow, updateMenuItemAR, refreshOrders, salesData, topItems, isRestaurantOpen, toggleRestaurantStatus } = useOrders();
   const [ownerTab, setOwnerTab] = useState('orders');
   const [previewOrder, setPreviewOrder] = useState<Order | null>(null);
   const [uploadingAR, setUploadingAR] = useState<string | null>(null);
@@ -63,21 +63,24 @@ const OwnerSection = () => {
 
   // ── Computed stats (TODAY only for top cards) ──
   const todayStats = useMemo(() => {
-    const live = todayOrders.filter(o => o.status !== 'rejected' && o.status !== 'cancelled' && o.status !== 'no_show');
+    const live = todayOrders.filter(o => o.status === 'completed');
     const totalRevenue = live.reduce((s, o) => s + o.totalAmount, 0);
     const totalOrders = todayOrders.length;
+    const pendingCount = todayOrders.filter(o => o.status === 'pending').length;
+    const confirmedCount = todayOrders.filter(o => o.status === 'confirmed').length;
+    const readyCount = todayOrders.filter(o => o.status === 'ready').length;
     const noShowOrders = todayOrders.filter(o => o.status === 'no_show');
     const noShowCount = noShowOrders.length;
     const noShowLoss = noShowOrders.reduce((s, o) => s + o.totalAmount, 0);
     const avgOrderValue = live.length > 0 ? Math.round(totalRevenue / live.length) : 0;
     const uniqueCustomers = new Set(todayOrders.map(o => o.userPhone)).size;
     const billsSent = todayOrders.filter(o => o.billSent).length;
-    return { totalRevenue, totalOrders, noShowCount, noShowLoss, avgOrderValue, uniqueCustomers, billsSent };
+    return { totalRevenue, totalOrders, pendingCount, confirmedCount, readyCount, noShowCount, noShowLoss, avgOrderValue, uniqueCustomers, billsSent };
   }, [todayOrders]);
 
   // ── All-time stats for pipeline & analytics ──
   const stats = useMemo(() => {
-    const liveOrders = orders.filter(o => o.status !== 'rejected' && o.status !== 'cancelled' && o.status !== 'no_show');
+    const liveOrders = orders.filter(o => o.status === 'completed');
     const totalRevenue = liveOrders.reduce((s, o) => s + o.totalAmount, 0);
     const totalOrders = orders.length;
     const pendingCount = orders.filter(o => o.status === 'pending').length;
@@ -86,8 +89,8 @@ const OwnerSection = () => {
     const noShowOrders = orders.filter(o => o.status === 'no_show');
     const noShowCount = noShowOrders.length;
     const noShowLoss = noShowOrders.reduce((s, o) => s + o.totalAmount, 0);
-    const dineInOrders = orders.filter(o => o.orderType === 'dine-in' && o.status !== 'rejected' && o.status !== 'cancelled' && o.status !== 'no_show');
-    const preOrders = orders.filter(o => o.orderType === 'preorder' && o.status !== 'rejected' && o.status !== 'cancelled' && o.status !== 'no_show');
+    const dineInOrders = orders.filter(o => o.orderType === 'dine-in' && o.status === 'completed');
+    const preOrders = orders.filter(o => o.orderType === 'preorder' && o.status === 'completed');
     const dineInRevenue = dineInOrders.reduce((s, o) => s + o.totalAmount, 0);
     const preOrderRevenue = preOrders.reduce((s, o) => s + o.totalAmount, 0);
     const avgOrderValue = liveOrders.length > 0 ? Math.round(totalRevenue / liveOrders.length) : 0;
@@ -95,7 +98,7 @@ const OwnerSection = () => {
     const billsSent = orders.filter(o => o.billSent).length;
 
     const counts: Record<string, { count: number; revenue: number; emoji: string }> = {};
-    orders.filter(o => o.status !== 'rejected' && o.status !== 'cancelled' && o.status !== 'no_show').forEach(o => {
+    orders.filter(o => o.status === 'completed').forEach(o => {
       [...o.items, ...o.additionalRequests].forEach(i => {
         if (!counts[i.menuItem.name]) counts[i.menuItem.name] = { count: 0, revenue: 0, emoji: i.menuItem.emoji };
         counts[i.menuItem.name].count += i.quantity;
@@ -181,12 +184,10 @@ const OwnerSection = () => {
 
       if (monthOrders && monthOrders.length > 0) {
         const orderIds = monthOrders.map(o => o.id);
-        // Delete order items first
-        for (const oid of orderIds) {
-          await supabase.from('order_items').delete().eq('order_id', oid);
-        }
-        // Delete orders
-        await supabase.from('orders').delete().gte('created_at', start).lte('created_at', end);
+        // Delete order items in a single query to prevent N+1 DB rate limiting
+        await supabase.from('order_items').delete().in('order_id', orderIds);
+        // Delete exactly those orders by ID to prevent orphaned items race condition
+        await supabase.from('orders').delete().in('id', orderIds);
       }
 
       toast.success(`Deleted ${archiveOrders.length} orders from ${archiveLabel}`);
@@ -198,7 +199,7 @@ const OwnerSection = () => {
     } finally {
       setDeletingMonth(false);
     }
-  }, [archiveMonth, archiveOrders, archiveLabel]);
+  }, [archiveMonth, archiveOrders, archiveLabel, refreshOrders]);
 
   const getOrderItems = (order: Order) => [
     ...order.items.map(i => ({ name: i.menuItem.name, qty: i.quantity, price: i.menuItem.price })),
@@ -225,7 +226,7 @@ const OwnerSection = () => {
   const handleARUpload = async (menuItemId: string, file: File) => {
     setUploadingAR(menuItemId);
     try {
-      const fileName = `${menuItemId}-${Date.now()}.glb`;
+      const fileName = `${menuItemId}.glb`;
       const { error: uploadError } = await supabase.storage
         .from('ar_models')
         .upload(fileName, file, { contentType: 'model/gltf-binary', upsert: true });
@@ -236,7 +237,8 @@ const OwnerSection = () => {
         finalUrl = URL.createObjectURL(file);
       } else {
         const { data: urlData } = supabase.storage.from('ar_models').getPublicUrl(fileName);
-        finalUrl = urlData.publicUrl;
+        // Add timestamp to break browser cache after upsert
+        finalUrl = `${urlData.publicUrl}?t=${Date.now()}`;
       }
       
       await updateMenuItemAR(menuItemId, finalUrl);
@@ -269,10 +271,25 @@ const OwnerSection = () => {
             <Zap className="h-3.5 w-3.5 text-primary" /> Today's Overview — {format(new Date(), 'dd MMM yyyy')}
           </p>
         </div>
-        <Badge className="bg-accent/15 text-accent border-accent/30 rounded-full px-3 py-1 text-xs font-semibold">
-          <span className="relative flex h-2 w-2 mr-1.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75" /><span className="relative inline-flex rounded-full h-2 w-2 bg-accent" /></span>
-          Live
-        </Badge>
+        <div className="flex flex-col items-end gap-2">
+          <Badge className="bg-accent/15 text-accent border-accent/30 rounded-full px-3 py-1 text-xs font-semibold">
+            <span className="relative flex h-2 w-2 mr-1.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75" /><span className="relative inline-flex rounded-full h-2 w-2 bg-accent" /></span>
+            Live
+          </Badge>
+          <div className="flex items-center gap-2 bg-secondary/50 px-3 py-1.5 rounded-full border border-border/50">
+            <span className={`text-xs font-bold ${isRestaurantOpen ? 'text-success' : 'text-muted-foreground'}`}>
+              {isRestaurantOpen ? 'SHOP OPEN' : 'SHOP CLOSED'}
+            </span>
+            <Switch checked={isRestaurantOpen} onCheckedChange={async () => {
+              try {
+                await toggleRestaurantStatus();
+                toast.success(isRestaurantOpen ? 'Shop is now CLOSED' : 'Shop is now OPEN');
+              } catch {
+                toast.error('Failed to change shop status');
+              }
+            }} />
+          </div>
+        </div>
       </motion.div>
 
       {/* Today's Stat Cards */}
@@ -301,10 +318,10 @@ const OwnerSection = () => {
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Order Pipeline</p>
           <div className="grid grid-cols-4 gap-2">
             {[
-              { label: 'Pending', count: stats.pendingCount, color: 'bg-warning/20 text-warning' },
-              { label: 'Preparing', count: stats.confirmedCount, color: 'bg-primary/20 text-primary' },
-              { label: 'Ready', count: stats.readyCount, color: 'bg-accent/20 text-accent' },
-              { label: 'No-Show', count: stats.noShowCount, color: 'bg-destructive/20 text-destructive' },
+              { label: 'Pending', count: todayStats.pendingCount, color: 'bg-warning/20 text-warning' },
+              { label: 'Preparing', count: todayStats.confirmedCount, color: 'bg-primary/20 text-primary' },
+              { label: 'Ready', count: todayStats.readyCount, color: 'bg-accent/20 text-accent' },
+              { label: 'No-Show', count: todayStats.noShowCount, color: 'bg-destructive/20 text-destructive' },
             ].map(s => (
               <div key={s.label} className="text-center">
                 <div className={`rounded-xl py-2.5 ${s.color} font-black text-lg`}>{s.count}</div>
@@ -318,7 +335,7 @@ const OwnerSection = () => {
       <Tabs value={ownerTab} onValueChange={setOwnerTab}>
         <TabsList className="w-full grid grid-cols-5 rounded-2xl bg-secondary/80 p-1 h-auto">
           {[
-            { value: 'orders', icon: <UtensilsCrossed className="h-3.5 w-3.5" />, label: 'Orders', count: stats.pendingCount },
+            { value: 'orders', icon: <UtensilsCrossed className="h-3.5 w-3.5" />, label: 'Orders', count: todayStats.pendingCount },
             { value: 'menu', icon: <Package className="h-3.5 w-3.5" />, label: 'Menu' },
             { value: 'analytics', icon: <BarChart3 className="h-3.5 w-3.5" />, label: 'Analytics' },
             { value: 'customers', icon: <Users className="h-3.5 w-3.5" />, label: 'Customers' },
@@ -338,7 +355,7 @@ const OwnerSection = () => {
 
         <TabsContent value="orders">
           <OwnerOrders
-            liveOrders={stats.liveOrders}
+            liveOrders={todayOrders.filter(o => o.status !== 'rejected' && o.status !== 'cancelled' && o.status !== 'no_show')}
             orders={orders}
             markNoShow={markNoShow}
             markBillSent={markBillSent}

@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { motion } from 'framer-motion';
-import { Flame, Loader2 } from 'lucide-react';
+import { Flame, Loader2, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-export function UserHero({ isAuthed, customerName, email, handleGoogleLogin, signingIn }: any) {
+export function UserHero({ isAuthed, customerName, email, handleGoogleLogin, signingIn, onSignOut }: any) {
   return (
     <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="text-center py-8 space-y-3">
       <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2, type: 'spring', stiffness: 200 }} className="text-5xl mb-2">🍛</motion.div>
@@ -14,9 +14,14 @@ export function UserHero({ isAuthed, customerName, email, handleGoogleLogin, sig
         <Flame className="h-3.5 w-3.5 text-primary" /> Fresh & made with love at The Curry Corner
       </p>
       {isAuthed ? (
-        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-primary font-medium">
-          ✅ Logged in as {customerName || email}
-        </motion.p>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-1">
+          <p className="text-xs text-primary font-medium">
+            ✅ Logged in as {customerName || email}
+          </p>
+          <Button variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-destructive gap-1 h-7 px-2" onClick={onSignOut}>
+            <LogOut className="h-3 w-3" /> Sign out
+          </Button>
+        </motion.div>
       ) : (
         <Button variant="outline" className="rounded-xl gap-2 mt-2" onClick={handleGoogleLogin} disabled={signingIn}>
           {signingIn ? <Loader2 className="h-4 w-4 animate-spin" /> : (

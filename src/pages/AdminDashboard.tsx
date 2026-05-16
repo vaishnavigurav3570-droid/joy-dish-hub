@@ -17,7 +17,7 @@ const ADMIN_TABS = [
 type TabId = 'worker' | 'owner';
 
 const AdminDashboard = () => {
-  const { user, role, loading, roleLoading, setGuestMode, signOut } = useAuth();
+  const { user, role, loading, roleLoading, signOut } = useAuth();
   const navigate = useNavigate();
 
   // Redirect non-admin users away
@@ -72,7 +72,7 @@ const AdminDashboard = () => {
                 variant="ghost"
                 size="icon"
                 className="h-9 w-9 rounded-xl text-muted-foreground hover:text-destructive"
-                onClick={async () => { await signOut(); setGuestMode(true); navigate('/'); }}
+                onClick={async () => { await signOut(); navigate('/'); }}
                 title="Sign out"
               >
                 <LogOut className="h-4 w-4" />

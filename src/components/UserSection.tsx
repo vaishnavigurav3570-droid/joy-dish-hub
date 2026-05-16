@@ -20,8 +20,8 @@ import { UserCart } from './user/UserCart';
 import { UserPreOrderSuccess, UserActiveOrder } from './user/UserActiveOrder';
 
 const UserSection = () => {
-  const { menu, orders, placeOrder, addMoreItems, cancelOrder, menuLoading } = useOrders();
-  const { user } = useAuth();
+  const { menu, orders, placeOrder, addMoreItems, cancelOrder, menuLoading, isRestaurantOpen } = useOrders();
+  const { user, signOut } = useAuth();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [tableNumber, setTableNumber] = useState('');
   const [phone, setPhone] = useState('');
@@ -153,6 +153,7 @@ const UserSection = () => {
   };
 
   const executePlaceOrder = async () => {
+    if (!isRestaurantOpen) { toast.error('Sorry, the shop is currently closed'); return; }
     if (!customerName.trim()) { toast.error('Please enter your name'); return; }
     if (orderType === 'dine-in' && !tableNumber) { toast.error('Please enter table number'); return; }
     const { valid, cleaned, error } = validateIndianPhone(phone);
@@ -201,6 +202,7 @@ const UserSection = () => {
   };
 
   const handleRequestMore = async () => {
+    if (!isRestaurantOpen) { toast.error('Sorry, the shop is currently closed'); return; }
     if (cart.length === 0) { toast.error('Add items first'); return; }
     if (activeOrderId) {
       try {
@@ -249,12 +251,26 @@ const UserSection = () => {
         />
       )}
 
+      {!isRestaurantOpen && (
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="bg-destructive/90 backdrop-blur-md text-destructive-foreground text-center py-3 px-4 font-bold text-sm shadow-lg rounded-b-3xl sticky top-0 z-40 border-b border-destructive/20">
+          🚫 We are currently closed. You can browse the menu, but ordering is disabled.
+        </motion.div>
+      )}
+
       <UserHero
         isAuthed={isAuthed}
         customerName={customerName}
         email={user?.email}
         handleGoogleLogin={handleGoogleLogin}
         signingIn={signingIn}
+        onSignOut={async () => {
+          await signOut();
+          setCustomerName('');
+          setPhone('');
+          setActiveOrderId(null);
+          localStorage.removeItem('activeOrderId');
+          toast.success('Signed out successfully');
+        }}
       />
 
       <UserPreOrderSuccess
@@ -313,6 +329,7 @@ const UserSection = () => {
           handlePlaceOrder={handlePlaceOrder}
           placing={placing}
           handleRequestMore={handleRequestMore}
+          isRestaurantOpen={isRestaurantOpen}
         />
       )}
       {/* Footer */}
