@@ -51,7 +51,6 @@ const ARViewerModal: React.FC<ARViewerModalProps> = ({ open, onClose, modelUrl, 
           {open && (
             <model-viewer
               src={modelUrl}
-              ios-src="https://developer.apple.com/augmented-reality/quick-look/models/pancakes/pancakes.usdz"
               alt={`3D model of ${itemName}`}
               ar
               ar-placement="floor"

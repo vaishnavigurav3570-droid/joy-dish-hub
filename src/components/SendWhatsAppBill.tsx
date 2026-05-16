@@ -31,26 +31,33 @@ const SendWhatsAppBill: React.FC<SendWhatsAppBillProps> = ({ order, onBillSent }
         canvas.toBlob(b => (b ? resolve(b) : reject(new Error('Failed to create image'))), 'image/png');
       });
 
-      const fileName = `bill-${order.id}-${Date.now()}.png`;
-      const { error: uploadError } = await supabase.storage
-        .from('bills')
-        .upload(fileName, blob, { contentType: 'image/png', upsert: true });
+      let publicUrl = '';
+      try {
+        const fileName = `bill-${order.id}-${Date.now()}.png`;
+        const { error: uploadError } = await supabase.storage
+          .from('bills')
+          .upload(fileName, blob, { contentType: 'image/png', upsert: true });
 
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage.from('bills').getPublicUrl(fileName);
-      const publicUrl = urlData.publicUrl;
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage.from('bills').getPublicUrl(fileName);
+          publicUrl = urlData.publicUrl;
+        } else {
+          console.warn('Bill storage upload failed (RLS or bucket missing), sending text-only:', uploadError.message);
+        }
+      } catch {
+        console.warn('Bill storage upload threw, sending text-only message');
+      }
 
       const promoText = `Skip the wait next time! Pre-order 20 mins before you arrive at: ${window.location.origin}`;
-      const reviewText = `Thank you for choosing Curry Corner! 🍛 If you loved your meal, please take 10 seconds to leave us a 5-star review here: https://g.page/r/YOUR_REVIEW_LINK`; // TODO: Replace YOUR_REVIEW_LINK with actual Google review short link
-      const message = `Hello! Thank you for dining at Curry Corner. Your total is ₹${order.totalAmount}. Here is your official bill: ${publicUrl}\n\n${promoText}\n\n${reviewText}`;
+      const billLine = publicUrl ? ` Here is your official bill: ${publicUrl}` : '';
+      const message = `Hello! Thank you for dining at Curry Corner. Your total is ₹${order.totalAmount}.${billLine}\n\n${promoText}`;
       const cleanPhone = order.userPhone.replace(/\D/g, '');
       const fullPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
       const waUrl = `https://wa.me/${fullPhone}?text=${encodeURIComponent(message)}`;
 
       window.open(waUrl, '_blank');
       onBillSent?.();
-      toast.success('Bill sent via WhatsApp!');
+      toast.success(publicUrl ? 'Bill sent via WhatsApp!' : 'Bill message sent (image upload unavailable)');
     } catch (err: unknown) {
       console.error('WhatsApp bill error:', err);
       toast.error((err as Error).message || 'Failed to send bill');

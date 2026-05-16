@@ -107,8 +107,8 @@ export function UserCart({
                         placeholder="Your Name"
                         value={customerName}
                         onChange={e => setCustomerName(e.target.value)}
-                        readOnly={isAuthed}
-                        disabled={isAuthed}
+                        readOnly={isAuthed && !!customerName.trim()}
+                        disabled={isAuthed && !!customerName.trim()}
                       />
                       <div className={`grid gap-3 ${orderType === 'dine-in' ? 'grid-cols-2' : 'grid-cols-1'}`}>
                         {orderType === 'dine-in' && (

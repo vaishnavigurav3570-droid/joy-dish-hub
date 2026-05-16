@@ -9,7 +9,8 @@ const MonthlyReportPDF = forwardRef<HTMLDivElement, MonthlyReportPDFProps>(({ or
   const now = new Date();
   const monthName = now.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-  const totalRevenue = orders.reduce((sum, o) => sum + o.totalAmount, 0);
+  const liveOrders = orders.filter(o => o.status !== 'rejected' && o.status !== 'cancelled' && o.status !== 'no_show');
+  const totalRevenue = liveOrders.reduce((sum, o) => sum + o.totalAmount, 0);
   const totalOrders = orders.length;
 
   const noShowOrders = orders.filter(o => o.status === 'no_show');

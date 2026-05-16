@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MenuItem, Order, CartItem, OrderType } from '@/types/order';
 import { supabase } from '@/integrations/supabase/client';
@@ -97,7 +97,7 @@ const mapOrder = (row: any): Order => {
     tableNumber: row.table_number,
     items: orderItems,
     status: row.status,
-    createdAt: new Date(row.created_at),
+    createdAt: row.created_at ? new Date(row.created_at) : new Date(),
     userPhone: row.customer_phone,
     customerName: row.customer_name || '',
     totalAmount: Number(row.total_amount),
@@ -117,6 +117,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const queryClient = useQueryClient();
   const [orders, setOrders] = useState<Order[]>([]);
   const [dbOrderMap, setDbOrderMap] = useState<Record<string, string>>({});
+  // Ref always holds the latest dbOrderMap so callbacks never use stale closures
+  const dbOrderMapRef = useRef<Record<string, string>>({});
 
   const isAdmin = user && (role === 'worker' || role === 'owner');
 
@@ -147,6 +149,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const idMap: Record<string, string> = {};
       data.forEach((row: any) => { idMap[row.order_number] = row.id; });
       setDbOrderMap(idMap);
+      dbOrderMapRef.current = idMap;
     }
   }, [isAdmin]);
 
@@ -205,7 +208,13 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       quantity: i.quantity,
       is_additional: false,
     }));
-    await supabase.from('order_items').insert(orderItems);
+    const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
+    if (itemsError) {
+      console.error('Failed to insert order items:', itemsError.message);
+      // Clean up the orphaned order
+      await supabase.from('orders').delete().eq('id', orderData.id);
+      throw new Error(`Failed to save order items: ${itemsError.message}`);
+    }
 
     const order: Order = {
       id: orderNumber,
@@ -222,22 +231,23 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       pickupPin,
     };
     setOrders(prev => [order, ...prev]);
-    setDbOrderMap(prev => ({ ...prev, [orderNumber]: orderData.id }));
+    const newMap = { ...dbOrderMapRef.current, [orderNumber]: orderData.id };
+    setDbOrderMap(newMap);
+    dbOrderMapRef.current = newMap;
 
     return { orderNumber, pickupPin };
   }, [user]);
 
   const updateOrderStatus = useCallback(async (orderNumber: string, status: string) => {
     setOrders(prev => prev.map(o => o.id === orderNumber ? { ...o, status: status as any } : o));
-    const dbId = dbOrderMap[orderNumber];
+    const dbId = dbOrderMapRef.current[orderNumber];
     if (dbId) {
       const { error } = await supabase.from('orders').update({ status }).eq('id', dbId);
       if (error) console.error('UPDATE order status failed:', error.message, error.code, error.details);
-      else console.log('UPDATE order status OK:', orderNumber, '->', status);
     } else {
-      console.warn('No dbId found for order:', orderNumber, 'dbOrderMap:', dbOrderMap);
+      console.warn('No dbId found for order:', orderNumber);
     }
-  }, [dbOrderMap]);
+  }, []);
 
   const confirmOrder = useCallback((id: string) => { updateOrderStatus(id, 'confirmed'); }, [updateOrderStatus]);
   const rejectOrder = useCallback((id: string) => { updateOrderStatus(id, 'rejected'); }, [updateOrderStatus]);
@@ -247,14 +257,19 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const addMoreItems = useCallback(async (orderId: string, items: CartItem[]) => {
     const additionalTotal = items.reduce((sum, i) => sum + i.menuItem.price * i.quantity, 0);
-    let newTotal = 0;
-    setOrders(prev => prev.map(o => {
-      if (o.id !== orderId) return o;
-      newTotal = o.totalAmount + additionalTotal;
-      return { ...o, additionalRequests: [...o.additionalRequests, ...items], totalAmount: newTotal };
-    }));
 
-    const dbId = dbOrderMap[orderId];
+    // Compute newTotal from current state synchronously before any async work
+    let newTotal = 0;
+    setOrders(prev => {
+      const updated = prev.map(o => {
+        if (o.id !== orderId) return o;
+        newTotal = o.totalAmount + additionalTotal;
+        return { ...o, additionalRequests: [...o.additionalRequests, ...items], totalAmount: newTotal };
+      });
+      return updated;
+    });
+
+    const dbId = dbOrderMapRef.current[orderId];
     if (dbId) {
       const orderItems = items.map(i => ({
         order_id: dbId,
@@ -269,19 +284,18 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         await supabase.from('orders').update({ total_amount: newTotal }).eq('id', dbId);
       }
     }
-  }, [dbOrderMap]);
+  }, []);
 
   const markBillSent = useCallback(async (orderId: string) => {
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, billSent: true, status: 'completed' } : o));
-    const dbId = dbOrderMap[orderId];
+    const dbId = dbOrderMapRef.current[orderId];
     if (dbId) {
       const { error } = await supabase.from('orders').update({ bill_sent: true, status: 'completed' }).eq('id', dbId);
       if (error) console.error('UPDATE markBillSent failed:', error.message, error.code, error.details);
-      else console.log('UPDATE markBillSent OK:', orderId);
     } else {
       console.warn('No dbId found for markBillSent:', orderId);
     }
-  }, [dbOrderMap]);
+  }, []);
 
   const updateMenuItemAR = useCallback(async (menuItemId: string, arModelUrl: string) => {
     queryClient.setQueryData(['menu'], (prev: any) => prev?.map((m: any) => m.id === menuItemId ? { ...m, ar_model_url: arModelUrl } : m) || []);

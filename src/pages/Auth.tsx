@@ -19,21 +19,30 @@ const Auth = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isSignup, setIsSignup] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   // Redirect to admin dashboard when logged in as admin
   // Sign out non-admin users so they can enter admin credentials
   useEffect(() => {
-    if (!loading && !roleLoading && user) {
+    if (loading || roleLoading || signingOut) return;
+
+    if (user) {
       if (role === 'worker' || role === 'owner') {
         navigate('/admin/dashboard', { replace: true });
       } else {
         // Customer (Google user) trying to access admin — sign them out first
+        setSigningOut(true);
         supabase.auth.signOut().then(() => {
           toast.info('Please sign in with admin credentials');
+          // signOut triggers onAuthStateChange which clears user in context.
+          // setSigningOut(false) will happen on the next render when user becomes null.
         });
       }
+    } else {
+      // User is null — if we were signing out, we're done now
+      if (signingOut) setSigningOut(false);
     }
-  }, [user, role, loading, roleLoading, navigate]);
+  }, [user, role, loading, roleLoading, navigate, signingOut]);
 
   const handleAuth = async () => {
     if (!email || !password) {
@@ -76,6 +85,20 @@ const Auth = () => {
     { id: 'worker' as RoleTab, label: 'Kitchen Staff', icon: ChefHat, desc: 'Manage & prepare orders' },
     { id: 'owner' as RoleTab, label: 'Owner / Admin', icon: Crown, desc: 'Full restaurant control' },
   ];
+
+  // While loading auth state or signing out a Google user, show spinner
+  if (loading || roleLoading || signingOut) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-muted-foreground text-sm">
+            {signingOut ? 'Preparing admin login...' : 'Loading...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">

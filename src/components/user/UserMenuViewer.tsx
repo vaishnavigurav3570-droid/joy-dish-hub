@@ -33,8 +33,8 @@ export function UserMenuViewer({ categories, activeCategory, setActiveCategory, 
         <motion.div key={activeCategory} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }} className="grid grid-cols-2 gap-4">
           {availableMenu.filter((i: MenuItem) => i.category === activeCategory).map((item: MenuItem, idx: number) => {
             const qty = getCartQty(item.id);
-            const hasAR = true;
-            const finalArUrl = (item as unknown as { ar_model_url?: string }).ar_model_url || 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Avocado/glTF-Binary/Avocado.glb';
+            const arUrl = (item as unknown as { ar_model_url?: string }).ar_model_url;
+            const hasAR = !!arUrl;
             return (
               <motion.div key={item.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}>
                 <Card className="overflow-hidden rounded-2xl hover:food-card-shadow transition-all duration-300 group cursor-pointer border-border/50 hover:border-primary/30 hover:-translate-y-1 active:scale-[0.98]" onClick={() => addToCart(item)}>
@@ -61,7 +61,7 @@ export function UserMenuViewer({ categories, activeCategory, setActiveCategory, 
                     </div>
                     {hasAR && (
                       <button
-                        onClick={(e) => { e.stopPropagation(); setArModel({ url: finalArUrl, name: item.name }); }}
+                        onClick={(e) => { e.stopPropagation(); setArModel({ url: arUrl!, name: item.name }); }}
                         className="absolute top-2 left-2 bg-accent text-accent-foreground text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-lg hover:scale-105 transition-transform"
                       >
                         <Box className="h-3 w-3" /> View in AR 🧊

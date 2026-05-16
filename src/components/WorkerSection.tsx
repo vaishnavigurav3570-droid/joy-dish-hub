@@ -10,24 +10,28 @@ import BlacklistBanner from './BlacklistBanner';
 import { supabase } from '@/integrations/supabase/client';
 
 const DISMISSED_KEY = 'kitchen_dismissed_orders';
+const MAX_DISMISSED = 200;
 
 const getDismissedOrders = (): string[] => {
   try {
-    return JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]');
+    const stored = JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]');
+    // Cap at MAX_DISMISSED to prevent unbounded growth
+    return Array.isArray(stored) ? stored.slice(-MAX_DISMISSED) : [];
   } catch { return []; }
 };
 
 const WorkerSection = () => {
   const { orders, confirmOrder, rejectOrder, markReady } = useOrders();
   const [dismissedIds, setDismissedIds] = useState<string[]>(getDismissedOrders);
+  const dismissedSet = new Set(dismissedIds);
 
   // Sync to localStorage whenever dismissedIds changes
   useEffect(() => {
-    localStorage.setItem(DISMISSED_KEY, JSON.stringify(dismissedIds));
+    localStorage.setItem(DISMISSED_KEY, JSON.stringify(dismissedIds.slice(-MAX_DISMISSED)));
   }, [dismissedIds]);
 
   // Filter out dismissed orders from all views
-  const visibleOrders = orders.filter(o => !dismissedIds.includes(o.id));
+  const visibleOrders = orders.filter(o => !dismissedSet.has(o.id));
 
   const pendingOrders = visibleOrders.filter(o => o.status === 'pending');
   const activeOrders = visibleOrders.filter(o => o.status === 'confirmed');
