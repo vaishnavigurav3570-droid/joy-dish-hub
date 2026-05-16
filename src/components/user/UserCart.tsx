@@ -20,7 +20,7 @@ export function UserCart({
       {/* Floating Cart Button */}
       <AnimatePresence>
         {cartCount > 0 && (
-          <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 100, opacity: 0 }} className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-lg">
+          <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 100, opacity: 0 }} className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-lg" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
             <Button className="w-full gradient-warm text-primary-foreground rounded-2xl h-14 text-base font-bold shadow-2xl shadow-primary/30 hover:shadow-primary/50 transition-all relative" onClick={() => setShowCart(true)}>
               <ShoppingCart className="h-5 w-5 mr-3" />
               View Cart • {cartCount} item{cartCount > 1 ? 's' : ''} • ₹{cartTotal}
@@ -34,7 +34,7 @@ export function UserCart({
         {showCart && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50" onClick={() => setShowCart(false)} />
-            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 300 }} className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto shadow-2xl border-t border-border/50">
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 300 }} className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto shadow-2xl border-t border-border/50" style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}>
               <div className="flex items-center justify-between mb-5">
                 <h3 className="font-bold text-foreground text-xl flex items-center gap-2">🛒 Your Cart</h3>
                 <button onClick={() => setShowCart(false)} className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors">

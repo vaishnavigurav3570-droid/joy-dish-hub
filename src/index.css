@@ -122,10 +122,27 @@
     font-family: var(--text-body);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Prevent pull-to-refresh interfering with cart sheet */
+    overscroll-behavior-y: contain;
   }
 
   h1, h2, h3 {
     font-family: var(--text-display);
+  }
+
+  /* Mobile: Prevent iOS auto-zoom on input focus (requires font-size >= 16px) */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+
+  /* Mobile: Faster tap response — remove 300ms delay */
+  button, a, [role="button"] {
+    touch-action: manipulation;
+  }
+
+  /* Mobile: Safe area padding for notched phones (iPhone X+) */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
 
