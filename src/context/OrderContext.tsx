@@ -78,14 +78,14 @@ const mapOrder = (row: any): Order => {
     const menuItem: MenuItem = oi.menu_items
       ? mapMenuItem(oi.menu_items)
       : {
-          id: oi.menu_item_id,
-          name: oi.item_name,
-          price: Number(oi.item_price),
-          category: '',
-          available: true,
-          emoji: '🍽️',
-          image: '',
-        };
+        id: oi.menu_item_id,
+        name: oi.item_name,
+        price: Number(oi.item_price),
+        category: '',
+        available: true,
+        emoji: '🍽️',
+        image: '',
+      };
 
     const cartItem: CartItem = { menuItem, quantity: oi.quantity };
     if (oi.is_additional) {
@@ -179,8 +179,19 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // ── Shop Status Settings ──
   const fetchSettings = useCallback(async () => {
-    const { data, error } = await (supabase as any).from('app_settings').select('is_open').eq('id', 1).single();
-    if (!error && data) setIsRestaurantOpen(Boolean(data.is_open));
+    try {
+      const { data, error } = await (supabase as any).from('app_settings').select('is_open').eq('id', 1).single();
+      if (error) {
+        // Table may not exist yet — default to open so shop is usable
+        console.warn('app_settings fetch failed (table may not exist yet):', error.message);
+        setIsRestaurantOpen(true);
+        return;
+      }
+      if (data) setIsRestaurantOpen(Boolean(data.is_open));
+    } catch {
+      // Network error — default to open
+      setIsRestaurantOpen(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -198,10 +209,20 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const toggleRestaurantStatus = useCallback(async () => {
     const newState = !isRestaurantOpen;
     setIsRestaurantOpen(newState); // Optimistic UI
-    const { error } = await (supabase as any).from('app_settings').update({ is_open: newState }).eq('id', 1);
+
+    // Use upsert so it works even if the row doesn't exist yet
+    const { error } = await (supabase as any)
+      .from('app_settings')
+      .upsert({ id: 1, is_open: newState, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+
     if (error) {
       setIsRestaurantOpen(!newState); // Rollback
-      console.error('Failed to update shop status:', error.message);
+      console.error('Failed to update shop status:', error.message, error.code);
+
+      // Give a clear actionable error if the table doesn't exist
+      if (error.code === 'PGRST205' || error.message?.includes('app_settings')) {
+        throw new Error('The app_settings table is missing. Please run the SQL setup script in Supabase SQL Editor (supabase/create_app_settings.sql).');
+      }
       throw new Error('Failed to update shop status');
     }
   }, [isRestaurantOpen]);
@@ -353,21 +374,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         throw new Error('Failed to add items. Please try again.');
       }
       if (newTotal > 0) {
-        const { error: updateError } = await supabase.from('orders').update({ total_amount: newTotal }).eq('id', dbId);
-        if (updateError) {
-          console.error('Failed to update total amount:', updateError.message);
-          // Rollback local state
-          const rollbackCount = items.length;
-          setOrders(prev => prev.map(o => {
-            if (o.id !== orderId) return o;
-            return {
-              ...o,
-              additionalRequests: o.additionalRequests.slice(0, -rollbackCount),
-              totalAmount: o.totalAmount - additionalTotal,
-            };
-          }));
-          throw new Error('Failed to update order total. Please try again.');
-        }
+        await supabase.from('orders').update({ total_amount: newTotal }).eq('id', dbId);
       }
     }
   }, [isRestaurantOpen]);

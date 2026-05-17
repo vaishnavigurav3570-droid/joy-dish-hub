@@ -63,7 +63,7 @@ const OwnerSection = () => {
 
   // ── Computed stats (TODAY only for top cards) ──
   const todayStats = useMemo(() => {
-    const live = todayOrders.filter(o => o.status === 'completed');
+    const live = todayOrders.filter(o => o.status !== 'rejected' && o.status !== 'cancelled' && o.status !== 'no_show');
     const totalRevenue = live.reduce((s, o) => s + o.totalAmount, 0);
     const totalOrders = todayOrders.length;
     const pendingCount = todayOrders.filter(o => o.status === 'pending').length;
@@ -80,7 +80,7 @@ const OwnerSection = () => {
 
   // ── All-time stats for pipeline & analytics ──
   const stats = useMemo(() => {
-    const liveOrders = orders.filter(o => o.status === 'completed');
+    const liveOrders = orders.filter(o => o.status !== 'rejected' && o.status !== 'cancelled' && o.status !== 'no_show');
     const totalRevenue = liveOrders.reduce((s, o) => s + o.totalAmount, 0);
     const totalOrders = orders.length;
     const pendingCount = orders.filter(o => o.status === 'pending').length;
@@ -89,8 +89,8 @@ const OwnerSection = () => {
     const noShowOrders = orders.filter(o => o.status === 'no_show');
     const noShowCount = noShowOrders.length;
     const noShowLoss = noShowOrders.reduce((s, o) => s + o.totalAmount, 0);
-    const dineInOrders = orders.filter(o => o.orderType === 'dine-in' && o.status === 'completed');
-    const preOrders = orders.filter(o => o.orderType === 'preorder' && o.status === 'completed');
+    const dineInOrders = orders.filter(o => o.orderType === 'dine-in' && o.status !== 'rejected' && o.status !== 'cancelled' && o.status !== 'no_show');
+    const preOrders = orders.filter(o => o.orderType === 'preorder' && o.status !== 'rejected' && o.status !== 'cancelled' && o.status !== 'no_show');
     const dineInRevenue = dineInOrders.reduce((s, o) => s + o.totalAmount, 0);
     const preOrderRevenue = preOrders.reduce((s, o) => s + o.totalAmount, 0);
     const avgOrderValue = liveOrders.length > 0 ? Math.round(totalRevenue / liveOrders.length) : 0;
@@ -98,7 +98,7 @@ const OwnerSection = () => {
     const billsSent = orders.filter(o => o.billSent).length;
 
     const counts: Record<string, { count: number; revenue: number; emoji: string }> = {};
-    orders.filter(o => o.status === 'completed').forEach(o => {
+    orders.filter(o => o.status !== 'rejected' && o.status !== 'cancelled' && o.status !== 'no_show').forEach(o => {
       [...o.items, ...o.additionalRequests].forEach(i => {
         if (!counts[i.menuItem.name]) counts[i.menuItem.name] = { count: 0, revenue: 0, emoji: i.menuItem.emoji };
         counts[i.menuItem.name].count += i.quantity;
@@ -184,10 +184,12 @@ const OwnerSection = () => {
 
       if (monthOrders && monthOrders.length > 0) {
         const orderIds = monthOrders.map(o => o.id);
-        // Delete order items in a single query to prevent N+1 DB rate limiting
-        await supabase.from('order_items').delete().in('order_id', orderIds);
-        // Delete exactly those orders by ID to prevent orphaned items race condition
-        await supabase.from('orders').delete().in('id', orderIds);
+        // Delete order items first
+        for (const oid of orderIds) {
+          await supabase.from('order_items').delete().eq('order_id', oid);
+        }
+        // Delete orders
+        await supabase.from('orders').delete().gte('created_at', start).lte('created_at', end);
       }
 
       toast.success(`Deleted ${archiveOrders.length} orders from ${archiveLabel}`);
@@ -226,21 +228,20 @@ const OwnerSection = () => {
   const handleARUpload = async (menuItemId: string, file: File) => {
     setUploadingAR(menuItemId);
     try {
-      const fileName = `${menuItemId}.glb`;
+      const fileName = `${menuItemId}-${Date.now()}.glb`;
       const { error: uploadError } = await supabase.storage
         .from('ar_models')
         .upload(fileName, file, { contentType: 'model/gltf-binary', upsert: true });
-      
+
       let finalUrl = '';
       if (uploadError) {
         console.warn('Storage upload RLS blocked, using local blob fallback:', uploadError.message);
         finalUrl = URL.createObjectURL(file);
       } else {
         const { data: urlData } = supabase.storage.from('ar_models').getPublicUrl(fileName);
-        // Add timestamp to break browser cache after upsert
-        finalUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+        finalUrl = urlData.publicUrl;
       }
-      
+
       await updateMenuItemAR(menuItemId, finalUrl);
       toast.success(uploadError ? 'Model loaded locally (DB prevented upload)' : '3D model uploaded!');
     } catch (err: unknown) {
@@ -284,8 +285,8 @@ const OwnerSection = () => {
               try {
                 await toggleRestaurantStatus();
                 toast.success(isRestaurantOpen ? 'Shop is now CLOSED' : 'Shop is now OPEN');
-              } catch {
-                toast.error('Failed to change shop status');
+              } catch (err: any) {
+                toast.error(err.message || 'Failed to change shop status');
               }
             }} />
           </div>

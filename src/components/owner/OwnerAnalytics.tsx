@@ -65,8 +65,8 @@ export default function OwnerAnalytics({ orders, menu, stats, handleExportPDF, e
               <motion.div key={item.name} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.08 }}
                 className="flex items-center gap-3">
                 <span className={`text-xs font-extrabold w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${idx === 0 ? 'gradient-warm text-primary-foreground shadow-lg shadow-primary/20' :
-                    idx === 1 ? 'bg-secondary text-foreground' :
-                      'bg-muted text-muted-foreground'
+                  idx === 1 ? 'bg-secondary text-foreground' :
+                    'bg-muted text-muted-foreground'
                   }`}>{idx + 1}</span>
                 <span className="text-lg">{item.emoji}</span>
                 <div className="flex-1 min-w-0">
@@ -89,7 +89,7 @@ export default function OwnerAnalytics({ orders, menu, stats, handleExportPDF, e
       <div className="grid grid-cols-2 gap-3">
         <Card className="p-4 rounded-2xl text-center">
           <Percent className="h-4 w-4 text-accent mx-auto mb-1" />
-          <p className="text-lg font-black text-foreground">{stats.liveOrders.length > 0 ? Math.round((stats.billsSent / stats.liveOrders.length) * 100) : 0}%</p>
+          <p className="text-lg font-black text-foreground">{stats.totalOrders > 0 ? Math.round((stats.billsSent / stats.totalOrders) * 100) : 0}%</p>
           <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Bills Sent</p>
         </Card>
         <Card className="p-4 rounded-2xl text-center">

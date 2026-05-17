@@ -19,11 +19,10 @@ export function UserMenuViewer({ categories, activeCategory, setActiveCategory, 
     <>
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
         {categories.map((cat: string) => (
-          <button key={cat} onClick={() => setActiveCategory(cat)} className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 ${
-            activeCategory === cat
+          <button key={cat} onClick={() => setActiveCategory(cat)} className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 ${activeCategory === cat
               ? 'gradient-warm text-primary-foreground shadow-lg shadow-primary/20 scale-105'
               : 'bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground'
-          }`}>
+            }`}>
             {cat}
           </button>
         ))}
@@ -33,7 +32,7 @@ export function UserMenuViewer({ categories, activeCategory, setActiveCategory, 
         <motion.div key={activeCategory} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }} className="grid grid-cols-2 gap-4">
           {availableMenu.filter((i: MenuItem) => i.category === activeCategory).map((item: MenuItem, idx: number) => {
             const qty = getCartQty(item.id);
-            const arUrl = item.ar_model_url;
+            const arUrl = (item as unknown as { ar_model_url?: string }).ar_model_url;
             const hasAR = !!arUrl;
             return (
               <motion.div key={item.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}>
@@ -71,9 +70,8 @@ export function UserMenuViewer({ categories, activeCategory, setActiveCategory, 
                   </div>
                   <div className="p-3 flex items-center justify-between">
                     <p className="text-primary font-extrabold text-lg">₹{item.price}</p>
-                    <div className={`h-8 w-8 rounded-full flex items-center justify-center transition-all duration-300 ${
-                      qty > 0 ? 'gradient-warm text-primary-foreground shadow-md' : 'bg-primary/10 text-primary group-hover:bg-primary/20'
-                    }`}>
+                    <div className={`h-8 w-8 rounded-full flex items-center justify-center transition-all duration-300 ${qty > 0 ? 'gradient-warm text-primary-foreground shadow-md' : 'bg-primary/10 text-primary group-hover:bg-primary/20'
+                      }`}>
                       <Plus className="h-4 w-4" />
                     </div>
                   </div>

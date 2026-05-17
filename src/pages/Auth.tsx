@@ -78,7 +78,10 @@ const Auth = () => {
         </Button>
 
         {/* Brand */}
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-3">
+          <div className="mx-auto w-20 h-20 rounded-2xl overflow-hidden shadow-xl shadow-primary/20 border-2 border-border/50 bg-secondary/50">
+            <img src="/logo.png" alt="The Curry Corner" className="w-full h-full object-cover" />
+          </div>
           <h1 className="text-3xl font-extrabold tracking-tight" style={{ fontFamily: 'var(--text-display)' }}>
             <span className="text-gradient-warm">The Curry</span>
             <span className="text-foreground"> Corner</span>

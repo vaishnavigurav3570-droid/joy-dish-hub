@@ -55,7 +55,7 @@ export default function OwnerArchives({
             <p className="text-xs text-muted-foreground mt-2">
               {archiveLabel}: <span className="font-bold text-foreground">{archiveOrders.length}</span> orders • ₹
               <span className="font-bold text-primary">
-                {archiveOrders.filter(o => o.status === 'completed').reduce((s, o) => s + o.totalAmount, 0).toLocaleString()}
+                {archiveOrders.filter(o => o.status !== 'rejected' && o.status !== 'cancelled' && o.status !== 'no_show').reduce((s, o) => s + o.totalAmount, 0).toLocaleString()}
               </span> revenue
             </p>
           </div>
@@ -106,7 +106,7 @@ export default function OwnerArchives({
               <AlertTriangle className="h-5 w-5" /> Delete {archiveLabel} Data?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete <span className="font-bold">{archiveOrders.length} orders</span> from {archiveLabel}. 
+              This will permanently delete <span className="font-bold">{archiveOrders.length} orders</span> from {archiveLabel}.
               This action cannot be undone. Are you sure you want to proceed?
             </AlertDialogDescription>
           </AlertDialogHeader>

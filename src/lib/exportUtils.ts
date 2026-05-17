@@ -58,7 +58,7 @@ export const exportArchivePDF = (archiveOrders: Order[], archiveLabel: string) =
   };
 
   // ── Filter valid revenue orders ──
-  const revenueOrders = archiveOrders.filter(o => o.status === 'completed');
+  const revenueOrders = archiveOrders.filter(o => o.status !== 'rejected' && o.status !== 'cancelled' && o.status !== 'no_show');
   const totalRevenue = revenueOrders.reduce((s, o) => s + o.totalAmount, 0);
   const noShowOrders = archiveOrders.filter(o => o.status === 'no_show');
   const noShowLoss = noShowOrders.reduce((s, o) => s + o.totalAmount, 0);
@@ -129,13 +129,13 @@ export const exportArchivePDF = (archiveOrders: Order[], archiveLabel: string) =
     if (dayOrders.length === 0) return; // Skip days with no orders
 
     const dayRevenue = dayOrders
-      .filter(o => o.status === 'completed')
+      .filter(o => o.status !== 'rejected' && o.status !== 'cancelled' && o.status !== 'no_show')
       .reduce((s, o) => s + o.totalAmount, 0);
 
     // Collect items sold this day
     const dayItems: Record<string, number> = {};
     dayOrders
-      .filter(o => o.status === 'completed')
+      .filter(o => o.status !== 'rejected' && o.status !== 'cancelled' && o.status !== 'no_show')
       .forEach(o => {
         [...o.items, ...o.additionalRequests].forEach(i => {
           dayItems[i.menuItem.name] = (dayItems[i.menuItem.name] || 0) + i.quantity;

@@ -52,7 +52,14 @@ const WorkerSection = () => {
 
     // Also try to update DB status to completed (best effort)
     try {
-      await supabase.from('orders').update({ status: 'completed' }).eq('order_number', id);
+      const { data } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('order_number', id)
+        .single();
+      if (data) {
+        await supabase.from('orders').update({ status: 'completed' }).eq('id', data.id);
+      }
     } catch { /* silent - localStorage handles persistence */ }
   };
 
