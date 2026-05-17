@@ -25,9 +25,20 @@ GRANT SELECT ON storage.objects TO anon;
 GRANT SELECT ON storage.buckets TO authenticated;
 GRANT SELECT ON storage.buckets TO anon;
 
--- 4. Fix menu RLS
+-- 4. Fix menu RLS & Realtime
 DROP POLICY IF EXISTS "Anyone can view menu" ON public.menu_items;
 CREATE POLICY "Anyone can view menu" ON public.menu_items FOR SELECT TO public USING (true);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'menu_items'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.menu_items;
+  END IF;
+END
+$$;
 
 -- 5. Fix orders RLS
 DROP POLICY IF EXISTS "Anyone can create orders" ON public.orders;

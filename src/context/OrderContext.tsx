@@ -158,8 +158,25 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
+  // ── Realtime subscriptions ──
+  useEffect(() => {
+    // 1. Menu updates (For everyone - customers and admins)
+    const menuChannel = supabase
+      .channel('menu-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, () => {
+        // Invalidate menu cache to trigger a refetch for all connected clients
+        queryClient.invalidateQueries({ queryKey: ['menu'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(menuChannel);
+    };
+  }, [queryClient]);
+
   useEffect(() => {
     if (!isAdmin) return;
+    // 2. Order updates (For admins only)
     // Debounce realtime refetches to prevent excessive API calls on busy days
     let timer: ReturnType<typeof setTimeout> | null = null;
     const debouncedFetch = () => {
